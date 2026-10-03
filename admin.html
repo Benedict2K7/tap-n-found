@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>TNF Admin Panel</title>
+
+    <link rel="stylesheet" href="./admin.css">
+</head>
+
+<body>
+
+    <!-- ================= LOGIN ================= -->
+
+    <section class="login-section" id="loginSection">
+
+        <div class="login-card">
+
+            <div class="brand">
+                <span class="brand-main">TNF</span>
+                <span>Tap N Found</span>
+            </div>
+
+            <h1>Admin Login</h1>
+
+            <p class="subtitle">
+                Sign in to manage registered NFC users.
+            </p>
+
+            <form id="loginForm">
+
+                <div class="form-group">
+                    <label for="username">
+                        Username
+                    </label>
+
+                    <input
+                        type="text"
+                        id="username"
+                        autocomplete="username"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">
+                        Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="password"
+                        autocomplete="current-password"
+                        required
+                    >
+                </div>
+
+                <button
+                    type="submit"
+                    id="loginButton"
+                >
+                    <span id="loginText">Login</span>
+                </button>
+
+                <p
+                    class="error-message"
+                    id="loginError"
+                ></p>
+
+            </form>
+
+        </div>
+
+    </section>
+
+
+    <!-- ================= DASHBOARD ================= -->
+
+    <section
+        class="dashboard"
+        id="dashboardSection"
+        hidden
+    >
+
+        <header class="dashboard-header">
+
+            <div>
+                <div class="small-title">
+                    TAP N FOUND
+                </div>
+
+                <h1>Admin Dashboard</h1>
+
+                <p>
+                    Manage registered NFC users and stickers.
+                </p>
+            </div>
+
+            <button
+                class="logout-button"
+                id="logoutButton"
+            >
+                Logout
+            </button>
+
+        </header>
+
+
+        <!-- ================= STATS ================= -->
+
+        <div class="stats-grid">
+
+            <div class="stat-card">
+                <span class="stat-label">
+                    Total Registrations
+                </span>
+
+                <strong id="totalUsers">
+                    0
+                </strong>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-label">
+                    Registered
+                </span>
+
+                <strong id="registeredUsers">
+                    0
+                </strong>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-label">
+                    Available
+                </span>
+
+                <strong id="availableUsers">
+                    0
+                </strong>
+            </div>
+
+        </div>
+
+
+        <!-- ================= USER TABLE ================= -->
+
+        <div class="table-card">
+
+            <div class="table-header">
+
+                <div>
+                    <h2>Registered NFC Users</h2>
+
+                    <p>
+                        All NFC registrations stored in MongoDB Atlas.
+                    </p>
+                </div>
+
+                <button
+                    class="refresh-button"
+                    id="refreshButton"
+                >
+                    Refresh
+                </button>
+
+            </div>
+
+
+            <div class="table-wrapper">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+                            <th>NFC ID</th>
+                            <th>Name</th>
+                            <th>Course</th>
+                            <th>Item</th>
+                            <th>Status</th>
+                            <th>Registered</th>
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="usersTableBody">
+
+                        <tr>
+                            <td
+                                colspan="6"
+                                class="loading"
+                            >
+                                Loading users...
+                            </td>
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <script src="./admin.js"></script>
+
+</body>
+</html>
