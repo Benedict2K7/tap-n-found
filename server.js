@@ -7,31 +7,66 @@ const path = require("path");
 
 const app = express();
 
+
+// =====================================================
+// MIDDLEWARE
+// =====================================================
+
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve your HTML/CSS/JS files when running locally.
+// Netlify serves the static files directly from the publish directory.
 app.use(express.static(__dirname));
 
-console.log("Starting server...");
-console.log("MongoDB URI loaded:", !!process.env.MONGODB_URI);
 
-if (process.env.MONGODB_URI) {
-    mongoose
-        .connect(process.env.MONGODB_URI)
-        .then(() => console.log("MongoDB connected!"))
-        .catch((error) =>
-            console.error(
-                "MongoDB connection failed:",
-                error.message
-            )
-        );
-} else {
-    console.error("MONGODB_URI is not defined!");
+// =====================================================
+// MONGODB CONNECTION
+// =====================================================
+
+let mongoConnectionPromise = null;
+
+async function connectMongoDB() {
+    const mongoUri = process.env.MONGODB_URI;
+
+    if (!mongoUri) {
+        throw new Error("MONGODB_URI is not configured.");
+    }
+
+    // Reuse an already-established connection
+    if (mongoose.connection.readyState === 1) {
+        return mongoose.connection;
+    }
+
+    // Reuse a connection attempt that is already in progress
+    if (!mongoConnectionPromise) {
+        mongoConnectionPromise = mongoose
+            .connect(mongoUri)
+            .then(() => {
+                console.log("MongoDB connected successfully!");
+                return mongoose.connection;
+            })
+            .catch((error) => {
+                console.error(
+                    "MongoDB connection failed:",
+                    error.message
+                );
+
+                // Allow the next request to try again
+                mongoConnectionPromise = null;
+
+                throw error;
+            });
+    }
+
+    return mongoConnectionPromise;
 }
 
 
-// ===============================
+// =====================================================
 // NFC SCHEMA
-// ===============================
+// =====================================================
 
 const nfcSchema = new mongoose.Schema({
     nfcId: {
@@ -66,19 +101,62 @@ const nfcSchema = new mongoose.Schema({
     }
 });
 
-const NFC = mongoose.model("NFC", nfcSchema);
+const NFC =
+    mongoose.models.NFC ||
+    mongoose.model("NFC", nfcSchema);
 
 
-// ===============================
+// =====================================================
+// HEALTH CHECK
+// =====================================================
+
+app.get("/api/health", async (req, res) => {
+
+    try {
+
+        await connectMongoDB();
+
+        res.status(200).json({
+            status: "OK",
+            message: "Tap N Found API is running.",
+            database: "MongoDB connected"
+        });
+
+    } catch (error) {
+
+        console.error(
+            "Health check MongoDB error:",
+            error.message
+        );
+
+        res.status(500).json({
+            status: "ERROR",
+            message: "MongoDB connection failed."
+        });
+
+    }
+});
+
+
+// =====================================================
 // REGISTER NFC
-// ===============================
+// =====================================================
 
 app.post("/api/nfc/register", async (req, res) => {
 
     try {
 
-        const { name, course, item } = req.body;
+        // Connect before doing database work
+        await connectMongoDB();
 
+        const {
+            name,
+            course,
+            item
+        } = req.body;
+
+
+        // Validate fields
         if (!name || !course || !item) {
 
             return res.status(400).json({
@@ -87,12 +165,16 @@ app.post("/api/nfc/register", async (req, res) => {
 
         }
 
+
+        // Create NFC ID
         const nfcId =
             "TNF-" +
             Date.now()
                 .toString(36)
                 .toUpperCase();
 
+
+        // Create document
         const newNFC = new NFC({
             nfcId,
             name,
@@ -100,15 +182,20 @@ app.post("/api/nfc/register", async (req, res) => {
             item
         });
 
+
+        // Save to MongoDB
         const savedNFC =
             await newNFC.save();
+
 
         console.log(
             "NFC registered:",
             savedNFC.nfcId
         );
 
-        res.status(201).json({
+
+        // Send response
+        return res.status(201).json({
 
             message:
                 "NFC registered successfully!",
@@ -125,7 +212,8 @@ app.post("/api/nfc/register", async (req, res) => {
             error
         );
 
-        res.status(500).json({
+
+        return res.status(500).json({
 
             message:
                 "Registration failed.",
@@ -136,17 +224,19 @@ app.post("/api/nfc/register", async (req, res) => {
         });
 
     }
-
 });
 
 
-// ===============================
-// GET ALL NFC
-// ===============================
+// =====================================================
+// GET ALL NFC RECORDS
+// =====================================================
 
 app.get("/api/nfc/all", async (req, res) => {
 
     try {
+
+        await connectMongoDB();
+
 
         const records =
             await NFC
@@ -155,16 +245,18 @@ app.get("/api/nfc/all", async (req, res) => {
                     createdAt: -1
                 });
 
-        res.json(records);
+
+        return res.status(200).json(records);
 
     } catch (error) {
 
         console.error(
-            "FETCH ERROR:",
+            "FETCH ALL ERROR:",
             error
         );
 
-        res.status(500).json({
+
+        return res.status(500).json({
 
             message:
                 "Failed to retrieve records."
@@ -172,23 +264,26 @@ app.get("/api/nfc/all", async (req, res) => {
         });
 
     }
-
 });
 
 
-// ===============================
-// GET ONE NFC
-// ===============================
+// =====================================================
+// GET ONE NFC BY ID
+// =====================================================
 
 app.get("/api/nfc/:nfcId", async (req, res) => {
 
     try {
+
+        await connectMongoDB();
+
 
         const record =
             await NFC.findOne({
                 nfcId:
                     req.params.nfcId
             });
+
 
         if (!record) {
 
@@ -201,16 +296,18 @@ app.get("/api/nfc/:nfcId", async (req, res) => {
 
         }
 
-        res.json(record);
+
+        return res.status(200).json(record);
 
     } catch (error) {
 
         console.error(
-            "FETCH ERROR:",
+            "FETCH NFC ERROR:",
             error
         );
 
-        res.status(500).json({
+
+        return res.status(500).json({
 
             message:
                 "Failed to retrieve NFC."
@@ -218,55 +315,15 @@ app.get("/api/nfc/:nfcId", async (req, res) => {
         });
 
     }
-
 });
 
 
-// ===============================
-// HEALTH CHECK
-// ===============================
+// =====================================================
+// LOCAL HTML ROUTES
+// =====================================================
 
-app.get("/api/health", async (req, res) => {
-
-    try {
-
-        await mongoose.connection
-            .asPromise();
-
-        res.json({
-
-            status: "OK",
-
-            message:
-                "Tap N Found API is running.",
-
-            database:
-                "MongoDB connected"
-
-        });
-
-    } catch (error) {
-
-        res.status(500).json({
-
-            status: "ERROR",
-
-            message:
-                "MongoDB connection failed.",
-
-            error:
-                error.message
-
-        });
-
-    }
-
-});
-
-
-// ===============================
-// HTML ROUTES
-// ===============================
+// These are mainly useful when running:
+// node server.js
 
 app.get("/", (req, res) => {
 
@@ -278,6 +335,7 @@ app.get("/", (req, res) => {
     );
 
 });
+
 
 app.get("/register.html", (req, res) => {
 
@@ -291,21 +349,31 @@ app.get("/register.html", (req, res) => {
 });
 
 
-// ===============================
-// EXPORT APP
-// ===============================
+// =====================================================
+// EXPORT EXPRESS APP
+// =====================================================
+
+// Required by:
+// netlify/functions/api.js
 
 module.exports = app;
 
 
-// ===============================
+// =====================================================
 // LOCAL SERVER ONLY
-// ===============================
+// =====================================================
+
+// This runs only when you execute:
+// node server.js
+//
+// Netlify imports the app instead, so it does not
+// start a localhost server.
 
 if (require.main === module) {
 
     const PORT =
         process.env.PORT || 5000;
+
 
     app.listen(
         PORT,
