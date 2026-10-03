@@ -111,33 +111,27 @@ const NFC =
 // =====================================================
 
 app.get("/api/health", async (req, res) => {
-
     try {
-
         await connectMongoDB();
 
         res.status(200).json({
             status: "OK",
             message: "Tap N Found API is running.",
-            database: "MongoDB connected"
+            database: "MongoDB connected",
+            mongoUriConfigured: true
         });
 
     } catch (error) {
-
-        console.error(
-            "Health check MongoDB error:",
-            error.message
-        );
+        console.error("MongoDB health error:", error);
 
         res.status(500).json({
             status: "ERROR",
-            message: "MongoDB connection failed."
+            message: "MongoDB connection failed.",
+            mongoUriConfigured: !!process.env.MONGODB_URI,
+            error: error.message
         });
-
     }
 });
-
-
 // =====================================================
 // REGISTER NFC
 // =====================================================
