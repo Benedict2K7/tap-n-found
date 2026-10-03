@@ -1064,6 +1064,14 @@ app.get("/admin.html", (req, res) => {
 
 });
 
+app.get("/api/admin/config-check", (req, res) => {
+    res.json({
+        ADMIN_USERNAME: !!process.env.ADMIN_USERNAME,
+        ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
+        ADMIN_SECRET: !!process.env.ADMIN_SECRET
+    });
+});
+
 
 // =====================================================
 // EXPORT EXPRESS APP
