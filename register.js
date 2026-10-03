@@ -1,154 +1,81 @@
 const form = document.getElementById("registerForm");
 
-const submitButton =
-    document.getElementById("submitButton");
-
-const submitText =
-    document.getElementById("submitText");
-
-const successMessage =
-    document.getElementById("successMessage");
-
+const submitButton = document.getElementById("submitButton");
+const submitText = document.getElementById("submitText");
+const successMessage = document.getElementById("successMessage");
 
 form.addEventListener("submit", async function (event) {
-
     event.preventDefault();
 
-    const name =
-        document.getElementById("name").value.trim();
-
-    const course =
-        document.getElementById("course").value.trim();
-
-    const item =
-        document.getElementById("item").value.trim();
-
-
-    // =====================================
-    // VALIDATION
-    // =====================================
+    const name = document.getElementById("name").value.trim();
+    const course = document.getElementById("course").value.trim();
+    const item = document.getElementById("item").value.trim();
 
     if (!name || !course || !item) {
-
         alert("Please fill all fields.");
-
         return;
     }
 
-
-    // =====================================
-    // BUTTON LOADING
-    // =====================================
-
     submitButton.disabled = true;
-
-    submitText.textContent =
-        "Registering...";
-
+    submitText.textContent = "Registering...";
 
     try {
+        const response = await fetch("/api/nfc/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                name,
+                course,
+                item
+            })
+        });
 
-        // =====================================
-        // SEND DATA TO SERVER
-        // =====================================
+        // Read the response as text first.
+        // This helps us see HTML/Netlify errors instead of hiding them.
+        const rawResponse = await response.text();
 
-        const response = await fetch(
-            "/api/nfc/register",
-            {
-                method: "POST",
+        console.log("HTTP status:", response.status);
+        console.log("Raw server response:", rawResponse);
 
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
+        let result;
 
-                body: JSON.stringify({
-
-                    name: name,
-                    course: course,
-                    item: item
-
-                })
-            }
-        );
-
-
-        const result =
-            await response.json();
-
-
-        console.log(
-            "Server response:",
-            result
-        );
-
-
-        // =====================================
-        // SUCCESS
-        // =====================================
-
-        if (response.ok) {
-
-            form.reset();
-
-            successMessage.classList.add(
-                "show"
+        try {
+            result = JSON.parse(rawResponse);
+        } catch {
+            throw new Error(
+                `Server returned non-JSON response (HTTP ${response.status}): ${rawResponse.substring(0, 300)}`
             );
-
-            console.log(
-                "NFC ID:",
-                result.nfcId
-            );
-
-
-            // Hide message after 5 seconds
-
-            setTimeout(() => {
-
-                successMessage.classList.remove(
-                    "show"
-                );
-
-            }, 5000);
-
-
         }
 
-        // =====================================
-        // SERVER ERROR
-        // =====================================
-
-        else {
-
-            alert(
+        if (!response.ok) {
+            throw new Error(
                 result.message ||
-                "Registration failed."
+                `Server error: HTTP ${response.status}`
             );
-
         }
 
+        console.log("NFC ID:", result.nfcId);
+
+        form.reset();
+
+        successMessage.classList.add("show");
+
+        setTimeout(() => {
+            successMessage.classList.remove("show");
+        }, 5000);
 
     } catch (error) {
-
-        console.error(
-            "Connection error:",
-            error
-        );
+        console.error("TNF API ERROR:", error);
 
         alert(
-            "Unable to connect to the server."
+            "TNF Server Error:\n\n" +
+            error.message
         );
 
+    } finally {
+        submitButton.disabled = false;
+        submitText.textContent = "Register NFC";
     }
-
-
-    // =====================================
-    // RESET BUTTON
-    // =====================================
-
-    submitButton.disabled = false;
-
-    submitText.textContent =
-        "Register NFC";
-
 });
