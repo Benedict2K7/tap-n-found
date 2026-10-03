@@ -7,74 +7,33 @@ const path = require("path");
 
 const app = express();
 
-
-// =====================================
-// MIDDLEWARE
-// =====================================
-
 app.use(cors());
 app.use(express.json());
-
-
-// =====================================
-// SERVE FRONTEND FILES
-// =====================================
-
-// This serves:
-// index.html
-// style.css
-// script.js
-// register.html
-// register.css
-// register.js
-
 app.use(express.static(__dirname));
 
-
-// =====================================
-// MONGODB CONNECTION
-// =====================================
-
 console.log("Starting server...");
-
-console.log(
-    "MongoDB URI loaded:",
-    !!process.env.MONGODB_URI
-);
+console.log("MongoDB URI loaded:", !!process.env.MONGODB_URI);
 
 if (process.env.MONGODB_URI) {
-
     mongoose
         .connect(process.env.MONGODB_URI)
-        .then(() => {
-
-            console.log("MongoDB connected!");
-
-        })
-        .catch((error) => {
-
+        .then(() => console.log("MongoDB connected!"))
+        .catch((error) =>
             console.error(
                 "MongoDB connection failed:",
                 error.message
-            );
-
-        });
-
+            )
+        );
 } else {
-
-    console.error(
-        "MONGODB_URI is not defined!"
-    );
-
+    console.error("MONGODB_URI is not defined!");
 }
 
 
-// =====================================
+// ===============================
 // NFC SCHEMA
-// =====================================
+// ===============================
 
 const nfcSchema = new mongoose.Schema({
-
     nfcId: {
         type: String,
         required: true,
@@ -105,42 +64,28 @@ const nfcSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
-
 });
 
 const NFC = mongoose.model("NFC", nfcSchema);
 
 
-// =====================================
+// ===============================
 // REGISTER NFC
-// =====================================
+// ===============================
 
 app.post("/api/nfc/register", async (req, res) => {
 
     try {
 
-        const {
-            name,
-            course,
-            item
-        } = req.body;
-
-
-        // Check required fields
+        const { name, course, item } = req.body;
 
         if (!name || !course || !item) {
 
             return res.status(400).json({
-
-                message:
-                    "Please fill all fields."
-
+                message: "Please fill all fields."
             });
 
         }
-
-
-        // Generate NFC ID
 
         const nfcId =
             "TNF-" +
@@ -148,32 +93,20 @@ app.post("/api/nfc/register", async (req, res) => {
                 .toString(36)
                 .toUpperCase();
 
-
-        // Create NFC
-
         const newNFC = new NFC({
-
             nfcId,
             name,
             course,
             item
-
         });
-
-
-        // Save to MongoDB
 
         const savedNFC =
             await newNFC.save();
-
 
         console.log(
             "NFC registered:",
             savedNFC.nfcId
         );
-
-
-        // Send response
 
         res.status(201).json({
 
@@ -184,7 +117,6 @@ app.post("/api/nfc/register", async (req, res) => {
                 savedNFC.nfcId
 
         });
-
 
     } catch (error) {
 
@@ -208,22 +140,22 @@ app.post("/api/nfc/register", async (req, res) => {
 });
 
 
-// =====================================
+// ===============================
 // GET ALL NFC
-// =====================================
+// ===============================
 
 app.get("/api/nfc/all", async (req, res) => {
 
     try {
 
         const records =
-            await NFC.find()
+            await NFC
+                .find()
                 .sort({
                     createdAt: -1
                 });
 
         res.json(records);
-
 
     } catch (error) {
 
@@ -244,9 +176,9 @@ app.get("/api/nfc/all", async (req, res) => {
 });
 
 
-// =====================================
+// ===============================
 // GET ONE NFC
-// =====================================
+// ===============================
 
 app.get("/api/nfc/:nfcId", async (req, res) => {
 
@@ -254,12 +186,9 @@ app.get("/api/nfc/:nfcId", async (req, res) => {
 
         const record =
             await NFC.findOne({
-
                 nfcId:
                     req.params.nfcId
-
             });
-
 
         if (!record) {
 
@@ -272,9 +201,7 @@ app.get("/api/nfc/:nfcId", async (req, res) => {
 
         }
 
-
         res.json(record);
-
 
     } catch (error) {
 
@@ -295,9 +222,51 @@ app.get("/api/nfc/:nfcId", async (req, res) => {
 });
 
 
-// =====================================
-// HOME PAGE
-// =====================================
+// ===============================
+// HEALTH CHECK
+// ===============================
+
+app.get("/api/health", async (req, res) => {
+
+    try {
+
+        await mongoose.connection
+            .asPromise();
+
+        res.json({
+
+            status: "OK",
+
+            message:
+                "Tap N Found API is running.",
+
+            database:
+                "MongoDB connected"
+
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+
+            status: "ERROR",
+
+            message:
+                "MongoDB connection failed.",
+
+            error:
+                error.message
+
+        });
+
+    }
+
+});
+
+
+// ===============================
+// HTML ROUTES
+// ===============================
 
 app.get("/", (req, res) => {
 
@@ -309,11 +278,6 @@ app.get("/", (req, res) => {
     );
 
 });
-
-
-// =====================================
-// REGISTER PAGE
-// =====================================
 
 app.get("/register.html", (req, res) => {
 
@@ -327,47 +291,28 @@ app.get("/register.html", (req, res) => {
 });
 
 
-// =====================================
-// HEALTH CHECK
-// =====================================
-
-app.get("/api/health", (req, res) => {
-
-    res.json({
-
-        status: "OK",
-
-        message:
-            "Tap N Found server is running."
-
-    });
-
-});
-
-
-// =====================================
-// VERCEL
-// =====================================
+// ===============================
+// EXPORT APP
+// ===============================
 
 module.exports = app;
 
 
-// =====================================
-// LOCAL SERVER
-// =====================================
+// ===============================
+// LOCAL SERVER ONLY
+// ===============================
 
 if (require.main === module) {
 
     const PORT =
         process.env.PORT || 5000;
 
-
     app.listen(
         PORT,
         () => {
 
             console.log(
-                `🚀 Server running at http://localhost:${PORT}`
+                `Server running at http://localhost:${PORT}`
             );
 
         }
