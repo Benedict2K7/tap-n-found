@@ -31,33 +31,34 @@ async function connectMongoDB() {
     const mongoUri = process.env.MONGODB_URI;
 
     if (!mongoUri) {
-        throw new Error("MONGODB_URI is not configured.");
+        throw new Error("MONGODB_URI is not configured in Netlify.");
     }
 
-    // Reuse an already-established connection
     if (mongoose.connection.readyState === 1) {
         return mongoose.connection;
     }
 
-    // Reuse a connection attempt that is already in progress
     if (!mongoConnectionPromise) {
-        mongoConnectionPromise = mongoose
-            .connect(mongoUri)
-            .then(() => {
-                console.log("MongoDB connected successfully!");
-                return mongoose.connection;
-            })
-            .catch((error) => {
-                console.error(
-                    "MongoDB connection failed:",
-                    error.message
-                );
+        mongoConnectionPromise = mongoose.connect(mongoUri, {
+            serverSelectionTimeoutMS: 10000,
+            connectTimeoutMS: 10000,
+            socketTimeoutMS: 10000,
+            maxIdleTimeMS: 60000
+        })
+        .then(() => {
+            console.log("MongoDB connected successfully!");
+            return mongoose.connection;
+        })
+        .catch((error) => {
+            mongoConnectionPromise = null;
 
-                // Allow the next request to try again
-                mongoConnectionPromise = null;
+            console.error(
+                "MongoDB connection failed:",
+                error.message
+            );
 
-                throw error;
-            });
+            throw error;
+        });
     }
 
     return mongoConnectionPromise;
