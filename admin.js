@@ -1,3 +1,20 @@
+// =====================================================
+// API BASE URL
+// =====================================================
+
+// IMPORTANT:
+// Replace this with your deployed backend URL.
+//
+// Example:
+// const API_URL = "https://tnf-backend.onrender.com";
+
+const API_URL = "YOUR_BACKEND_URL";
+
+
+// =====================================================
+// ELEMENTS
+// =====================================================
+
 const loginSection = document.getElementById("loginSection");
 const dashboardSection = document.getElementById("dashboardSection");
 
@@ -30,27 +47,41 @@ async function apiRequest(url, options = {}) {
 
     try {
 
-        const response = await fetch(url, {
-            ...options,
-            credentials: "include",
-            signal: controller.signal,
-            headers: {
-                "Content-Type": "application/json",
-                ...(options.headers || {})
+        const response = await fetch(
+            `${API_URL}${url}`,
+            {
+                ...options,
+
+                credentials: "include",
+
+                signal: controller.signal,
+
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(options.headers || {})
+                }
             }
-        });
+        );
+
 
         const text = await response.text();
 
         let data = {};
 
         try {
-            data = text ? JSON.parse(text) : {};
+
+            data = text
+                ? JSON.parse(text)
+                : {};
+
         } catch {
+
             throw new Error(
                 `Invalid server response (HTTP ${response.status})`
             );
+
         }
+
 
         if (!response.ok) {
 
@@ -62,14 +93,17 @@ async function apiRequest(url, options = {}) {
 
         }
 
+
         return data;
 
     } catch (error) {
 
         if (error.name === "AbortError") {
+
             throw new Error(
-                "Server request timed out. Check that the server is running."
+                "Server request timed out. Check that the backend server is running."
             );
+
         }
 
         throw error;
@@ -79,6 +113,7 @@ async function apiRequest(url, options = {}) {
         clearTimeout(timeout);
 
     }
+
 }
 
 
@@ -88,10 +123,17 @@ async function apiRequest(url, options = {}) {
 
 function showLogin() {
 
-    loginSection.hidden = false;
-    dashboardSection.hidden = true;
+    if (loginSection) {
+        loginSection.hidden = false;
+    }
 
-    loginError.textContent = "";
+    if (dashboardSection) {
+        dashboardSection.hidden = true;
+    }
+
+    if (loginError) {
+        loginError.textContent = "";
+    }
 
 }
 
@@ -102,8 +144,13 @@ function showLogin() {
 
 function showDashboard() {
 
-    loginSection.hidden = true;
-    dashboardSection.hidden = false;
+    if (loginSection) {
+        loginSection.hidden = true;
+    }
+
+    if (dashboardSection) {
+        dashboardSection.hidden = false;
+    }
 
 }
 
@@ -112,102 +159,146 @@ function showDashboard() {
 // LOGIN
 // =====================================================
 
-loginForm.addEventListener("submit", async function (event) {
+if (loginForm) {
 
-    event.preventDefault();
+    loginForm.addEventListener(
+        "submit",
+        async function (event) {
 
-    loginError.textContent = "";
+            event.preventDefault();
 
-    const username =
-        document.getElementById("username").value.trim();
-
-    const password =
-        document.getElementById("password").value;
-
-
-    if (!username || !password) {
-
-        loginError.textContent =
-            "Please enter username and password.";
-
-        return;
-
-    }
+            if (loginError) {
+                loginError.textContent = "";
+            }
 
 
-    loginButton.disabled = true;
-    loginText.textContent = "Logging...";
+            const usernameElement =
+                document.getElementById("username");
+
+            const passwordElement =
+                document.getElementById("password");
 
 
-    try {
+            const username =
+                usernameElement
+                    ? usernameElement.value.trim()
+                    : "";
 
-        // Login only
-        const result =
-            await apiRequest(
-                "/api/admin/login",
-                {
-                    method: "POST",
+            const password =
+                passwordElement
+                    ? passwordElement.value
+                    : "";
 
-                    body: JSON.stringify({
-                        username,
-                        password
-                    })
+
+            if (!username || !password) {
+
+                if (loginError) {
+                    loginError.textContent =
+                        "Please enter username and password.";
                 }
-            );
+
+                return;
+
+            }
 
 
-        console.log(
-            "Login response:",
-            result
-        );
+            if (loginButton) {
+                loginButton.disabled = true;
+            }
+
+            if (loginText) {
+                loginText.textContent = "Logging in...";
+            }
 
 
-        // Open dashboard immediately
-        showDashboard();
+            try {
+
+                const result =
+                    await apiRequest(
+                        "/api/admin/login",
+                        {
+                            method: "POST",
+
+                            body: JSON.stringify({
+                                username,
+                                password
+                            })
+                        }
+                    );
 
 
-        // Reset login button
-        loginButton.disabled = false;
-        loginText.textContent = "Login";
-
-        loginForm.reset();
-
-
-        // Load users separately
-        loadUsers();
+                console.log(
+                    "Admin login response:",
+                    result
+                );
 
 
-    } catch (error) {
-
-        console.error(
-            "Admin login error:",
-            error
-        );
+                // Login successful
+                showDashboard();
 
 
-        loginError.textContent =
-            error.message ||
-            "Login failed.";
+                if (loginForm) {
+                    loginForm.reset();
+                }
 
 
-        loginButton.disabled = false;
-        loginText.textContent = "Login";
+                // Load NFC registrations
+                await loadUsers();
 
-    }
 
-});
+            } catch (error) {
+
+                console.error(
+                    "Admin login error:",
+                    error
+                );
+
+
+                if (loginError) {
+
+                    loginError.textContent =
+                        error.message ||
+                        "Login failed.";
+
+                }
+
+            } finally {
+
+                if (loginButton) {
+                    loginButton.disabled = false;
+                }
+
+                if (loginText) {
+                    loginText.textContent = "Login";
+                }
+
+            }
+
+        }
+    );
+
+}
 
 
 // =====================================================
-// LOAD USERS
+// LOAD NFC REGISTRATIONS
 // =====================================================
 
 async function loadUsers() {
 
+    if (!usersTableBody) {
+        console.error(
+            "usersTableBody element was not found."
+        );
+
+        return;
+    }
+
+
     usersTableBody.innerHTML = `
         <tr>
             <td colspan="6" class="loading">
-                Loading users...
+                Loading NFC registrations...
             </td>
         </tr>
     `;
@@ -215,37 +306,83 @@ async function loadUsers() {
 
     try {
 
+        // =================================================
+        // GET NFC REGISTRATIONS
+        // =================================================
+
         const result =
             await apiRequest(
-                "/api/admin/users"
+                "/api/nfc/all"
             );
 
 
         console.log(
-            "Users response:",
+            "NFC registrations response:",
             result
         );
 
 
-        const stats =
-            result.stats || {};
-
+        // =================================================
+        // IMPORTANT
+        // /api/nfc/all RETURNS AN ARRAY DIRECTLY
+        // =================================================
 
         const users =
-            Array.isArray(result.users)
-                ? result.users
-                : [];
+            Array.isArray(result)
+                ? result
+                : (
+                    Array.isArray(result.users)
+                        ? result.users
+                        : []
+                );
 
 
-        totalUsers.textContent =
-            stats.total ?? users.length;
+        // =================================================
+        // CALCULATE STATS
+        // =================================================
 
-        registeredUsers.textContent =
-            stats.registered ?? 0;
+        const total =
+            users.length;
 
-        availableUsers.textContent =
-            stats.available ?? 0;
 
+        const registered =
+            users.filter(
+                user =>
+                    String(
+                        user.status || ""
+                    ).toLowerCase() === "registered"
+            ).length;
+
+
+        const available =
+            users.filter(
+                user =>
+                    String(
+                        user.status || ""
+                    ).toLowerCase() === "available"
+            ).length;
+
+
+        // =================================================
+        // DISPLAY STATS
+        // =================================================
+
+        if (totalUsers) {
+            totalUsers.textContent = total;
+        }
+
+        if (registeredUsers) {
+            registeredUsers.textContent = registered;
+        }
+
+        if (availableUsers) {
+            availableUsers.textContent = available;
+        }
+
+
+        // =================================================
+        // NO REGISTRATIONS
+        // =================================================
 
         if (users.length === 0) {
 
@@ -258,73 +395,82 @@ async function loadUsers() {
             `;
 
             return;
+
         }
 
 
+        // =================================================
+        // DISPLAY NFC REGISTRATIONS
+        // =================================================
+
         usersTableBody.innerHTML =
-            users.map(user => {
+            users
+                .map(
+                    user => {
 
-                const date =
-                    user.createdAt
-                        ? new Date(
+                        const date =
                             user.createdAt
-                        ).toLocaleString()
-                        : "-";
+                                ? new Date(
+                                    user.createdAt
+                                ).toLocaleString()
+                                : "-";
 
 
-                return `
-                    <tr>
+                        return `
+                            <tr>
 
-                        <td>
-                            <strong>
-                                ${escapeHtml(
-                                    user.nfcId
-                                )}
-                            </strong>
-                        </td>
+                                <td>
+                                    <strong>
+                                        ${escapeHtml(
+                                            user.nfcId
+                                        )}
+                                    </strong>
+                                </td>
 
-                        <td>
-                            ${escapeHtml(
-                                user.name
-                            )}
-                        </td>
+                                <td>
+                                    ${escapeHtml(
+                                        user.name
+                                    )}
+                                </td>
 
-                        <td>
-                            ${escapeHtml(
-                                user.course
-                            )}
-                        </td>
+                                <td>
+                                    ${escapeHtml(
+                                        user.course
+                                    )}
+                                </td>
 
-                        <td>
-                            ${escapeHtml(
-                                user.item
-                            )}
-                        </td>
+                                <td>
+                                    ${escapeHtml(
+                                        user.item
+                                    )}
+                                </td>
 
-                        <td>
-                            <span class="status">
-                                ${escapeHtml(
-                                    user.status
-                                )}
-                            </span>
-                        </td>
+                                <td>
+                                    <span class="status">
+                                        ${escapeHtml(
+                                            user.status
+                                        )}
+                                    </span>
+                                </td>
 
-                        <td>
-                            ${escapeHtml(
-                                date
-                            )}
-                        </td>
+                                <td>
+                                    ${escapeHtml(
+                                        date
+                                    )}
+                                </td>
 
-                    </tr>
-                `;
+                            </tr>
+                        `;
 
-            }).join("");
+                    }
+                )
+                .join("");
 
 
     } catch (error) {
 
         console.error(
-            "Load users error:",
+            "Load NFC registrations error:",
             error
         );
 
@@ -348,46 +494,55 @@ async function loadUsers() {
 // LOGOUT
 // =====================================================
 
-logoutButton.addEventListener(
-    "click",
-    async function () {
+if (logoutButton) {
 
-        try {
+    logoutButton.addEventListener(
+        "click",
+        async function () {
 
-            await apiRequest(
-                "/api/admin/logout",
-                {
-                    method: "POST"
-                }
-            );
+            try {
 
-        } catch (error) {
+                await apiRequest(
+                    "/api/admin/logout",
+                    {
+                        method: "POST"
+                    }
+                );
 
-            console.error(
-                "Logout error:",
-                error
-            );
+            } catch (error) {
+
+                console.error(
+                    "Logout error:",
+                    error
+                );
+
+            }
+
+
+            showLogin();
 
         }
+    );
 
-        showLogin();
-
-    }
-);
+}
 
 
 // =====================================================
 // REFRESH
 // =====================================================
 
-refreshButton.addEventListener(
-    "click",
-    async function () {
+if (refreshButton) {
 
-        await loadUsers();
+    refreshButton.addEventListener(
+        "click",
+        async function () {
 
-    }
-);
+            await loadUsers();
+
+        }
+    );
+
+}
 
 
 // =====================================================
@@ -397,17 +552,32 @@ refreshButton.addEventListener(
 function escapeHtml(value) {
 
     return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
 
 }
 
 
 // =====================================================
-// CHECK EXISTING SESSION
+// CHECK EXISTING ADMIN SESSION
 // =====================================================
 
 async function checkAdminSession() {
@@ -427,7 +597,7 @@ async function checkAdminSession() {
 
             showDashboard();
 
-            loadUsers();
+            await loadUsers();
 
             return;
 
@@ -437,6 +607,11 @@ async function checkAdminSession() {
         showLogin();
 
     } catch (error) {
+
+        console.error(
+            "Session check error:",
+            error
+        );
 
         showLogin();
 
@@ -450,3 +625,4 @@ async function checkAdminSession() {
 // =====================================================
 
 checkAdminSession();
+
