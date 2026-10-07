@@ -15,7 +15,7 @@ const app = express();
 
 app.use(
     cors({
-        origin: true,
+        origin: "https://tap-n-found.netlify.app/",
         credentials: true
     })
 );
