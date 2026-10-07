@@ -2,29 +2,57 @@
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-    <title>Register Your NFC - Tap N Found</title>
+    <title>
+        Register Your NFC - Tap N Found
+    </title>
 
-    <link rel="stylesheet" href="./register.css">
+    <link
+        rel="stylesheet"
+        href="./register.css"
+    >
+
 </head>
+
 
 <body>
 
-    <!-- NAVBAR -->
+
+    <!-- =================================================
+         NAVBAR
+    ================================================== -->
 
     <header class="navbar">
 
         <div class="nav-container">
 
-            <a href="index.html" class="logo">
-                <span class="logo-main">TNF</span>
-                <span class="logo-text">Tap N Found</span>
+            <a
+                href="index.html"
+                class="logo"
+            >
+
+                <span class="logo-main">
+                    TNF
+                </span>
+
+                <span class="logo-text">
+                    Tap N Found
+                </span>
+
             </a>
 
-            <a href="index.html" class="back-button">
+
+            <a
+                href="index.html"
+                class="back-button"
+            >
                 ← Back
             </a>
 
@@ -33,11 +61,17 @@
     </header>
 
 
-    <!-- REGISTER PAGE -->
+
+    <!-- =================================================
+         REGISTER PAGE
+    ================================================== -->
 
     <main class="register-page">
 
         <div class="register-container">
+
+
+            <!-- HEADER -->
 
             <div class="register-header">
 
@@ -50,20 +84,24 @@
                 </h1>
 
                 <p>
-                    Register your NFC sticker so your
-                    item can be safely returned if it
-                    is ever lost.
+                    Create your owner account and register
+                    your NFC sticker so your item can be
+                    safely returned if it is ever lost.
                 </p>
 
             </div>
 
 
-            <!-- FORM -->
+
+            <!-- =================================================
+                 FORM
+            ================================================== -->
 
             <form
                 class="register-form"
                 id="registerForm"
             >
+
 
                 <!-- NAME -->
 
@@ -85,6 +123,59 @@
                 </div>
 
 
+
+                <!-- GMAIL -->
+
+                <div class="form-group">
+
+                    <label for="email">
+                        Gmail Address
+                    </label>
+
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder="Enter your Gmail address"
+                        autocomplete="email"
+                        inputmode="email"
+                        required
+                    >
+
+                    <small>
+                        Use your Gmail address to identify your owner account.
+                    </small>
+
+                </div>
+
+
+
+                <!-- PASSWORD -->
+
+                <div class="form-group">
+
+                    <label for="password">
+                        Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="Create a password"
+                        autocomplete="new-password"
+                        minlength="6"
+                        required
+                    >
+
+                    <small>
+                        Password must contain at least 6 characters.
+                    </small>
+
+                </div>
+
+
+
                 <!-- COURSE -->
 
                 <div class="form-group">
@@ -102,6 +193,7 @@
                     >
 
                 </div>
+
 
 
                 <!-- ITEM -->
@@ -123,7 +215,8 @@
                 </div>
 
 
-                <!-- SUBMIT -->
+
+                <!-- SUBMIT BUTTON -->
 
                 <button
                     type="submit"
@@ -141,8 +234,12 @@
 
                 </button>
 
+
             </form>
 
+
+
+            <!-- PRIVACY -->
 
             <p class="privacy-text">
 
@@ -151,12 +248,16 @@
 
             </p>
 
+
         </div>
 
     </main>
 
 
-    <!-- SUCCESS NOTIFICATION -->
+
+    <!-- =================================================
+         SUCCESS NOTIFICATION
+    ================================================== -->
 
     <div
         class="success-message"
@@ -170,11 +271,12 @@
         <div>
 
             <strong>
-                NFC Registered Successfully!
+                Registration Successful!
             </strong>
 
             <p>
-                Your NFC has been registered successfully.
+                Your owner account and NFC have been
+                registered successfully.
             </p>
 
         </div>
@@ -185,7 +287,7 @@
 
     <!-- JAVASCRIPT -->
 
-<script src="./register.js"></script>
+    <script src="./register.js"></script>
 
 </body>
 

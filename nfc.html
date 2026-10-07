@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tap N Found</title>
+</head>
+
+<body>
+
+    <h1>Tap N Found</h1>
+
+    <p id="status">Checking NFC...</p>
+
+    <script>
+
+        // =====================================================
+        // GET NFC ID FROM URL
+        // =====================================================
+
+        const parts = window.location.pathname.split("/");
+        const nfcId = parts[parts.length - 1];
+
+        const statusElement =
+            document.getElementById("status");
+
+
+        // =====================================================
+        // IDENTIFY OWNER OR FINDER
+        // =====================================================
+
+        async function identifyUser() {
+
+            if (!nfcId || nfcId === "nfc") {
+
+                statusElement.textContent =
+                    "NFC ID is missing.";
+
+                return;
+            }
+
+            try {
+
+                statusElement.textContent =
+                    "Checking NFC...";
+
+                const response = await fetch(
+                    `/api/nfc/${encodeURIComponent(nfcId)}/identify`,
+                    {
+                        method: "GET",
+                        credentials: "include"
+                    }
+                );
+
+                const data = await response.json();
+
+                console.log("IDENTIFY RESPONSE:", data);
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.message ||
+                        "Unable to identify user."
+                    );
+                }
+
+
+                // =================================================
+                // OWNER
+                // =================================================
+
+                if (data.role === "owner") {
+
+                    statusElement.textContent =
+                        "Owner detected.";
+
+                    window.location.href =
+                        `/owner.html?nfcId=${encodeURIComponent(nfcId)}`;
+
+                    return;
+                }
+
+
+                // =================================================
+                // FINDER
+                // =================================================
+
+                if (data.role === "finder") {
+
+                    statusElement.textContent =
+                        "Finder detected. Starting private chat...";
+
+                    await startFinderChat();
+
+                    return;
+                }
+
+
+                throw new Error(
+                    "Unable to determine whether you are the owner or finder."
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "Identify error:",
+                    error
+                );
+
+                statusElement.textContent =
+                    error.message ||
+                    "Something went wrong.";
+            }
+        }
+
+
+        // =====================================================
+        // START FINDER CHAT
+        // =====================================================
+
+        async function startFinderChat() {
+
+            try {
+
+                const response = await fetch(
+                    "/api/chat/start",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        credentials: "include",
+
+                        body: JSON.stringify({
+                            nfcId: nfcId
+                        })
+                    }
+                );
+
+
+                const data =
+                    await response.json();
+
+                console.log(
+                    "CHAT START RESPONSE:",
+                    data
+                );
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.message ||
+                        "Unable to start chat."
+                    );
+                }
+
+
+                // =================================================
+                // IMPORTANT VALIDATION
+                // =================================================
+
+                if (!data.chatId) {
+
+                    console.error(
+                        "Server did not return chatId.",
+                        data
+                    );
+
+                    throw new Error(
+                        "Chat ID was not created by the server."
+                    );
+                }
+
+
+                if (!data.finderToken) {
+
+                    console.error(
+                        "Server did not return finderToken.",
+                        data
+                    );
+
+                    throw new Error(
+                        "Finder chat token was not created."
+                    );
+                }
+
+
+                // =================================================
+                // OPEN FINDER CHAT
+                // =================================================
+
+                const chatUrl =
+                    `/chat.html?` +
+                    `nfcId=${encodeURIComponent(nfcId)}` +
+                    `&chatId=${encodeURIComponent(data.chatId)}` +
+                    `&role=finder` +
+                    `&token=${encodeURIComponent(data.finderToken)}`;
+
+
+                console.log(
+                    "Opening chat:",
+                    chatUrl
+                );
+
+
+                window.location.href =
+                    chatUrl;
+
+            } catch (error) {
+
+                console.error(
+                    "Start chat error:",
+                    error
+                );
+
+                statusElement.textContent =
+                    error.message ||
+                    "Unable to start chat.";
+            }
+        }
+
+
+        // =====================================================
+        // START
+        // =====================================================
+
+        identifyUser();
+
+    </script>
+
+</body>
+</html>
