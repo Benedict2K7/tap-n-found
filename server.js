@@ -1238,73 +1238,73 @@ app.get(
     }
 );
 
-
 // =====================================================
-// ADMIN USERS
+// ADMIN USERS + NFC REGISTRATIONS
 // =====================================================
 
-app.get(
-    "/api/admin/users",
-    async (req, res) => {
+app.get("/api/admin/users", async (req, res) => {
+    try {
 
-        try {
-
-            if (
-                !adminAuthenticated(req)
-            ) {
-                return res.status(401).json({
-                    message:
-                        "Admin authentication required."
-                });
-            }
-
-            const owners =
-                await Owner.find()
-                    .select(
-                        "_id name email course createdAt"
-                    )
-                    .sort({
-                        createdAt: -1
-                    });
-
-            res.json(owners);
-
-        } catch (error) {
-
-            console.error(
-                "Admin users error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Failed to fetch users."
+        if (!adminAuthenticated(req)) {
+            return res.status(401).json({
+                message: "Admin authentication required."
             });
         }
-    }
-);
 
+        // Get all owners
+        const owners = await Owner.find()
+            .select("_id name email course createdAt")
+            .sort({ createdAt: -1 });
 
-// =====================================================
-// ADMIN LOGOUT
-// =====================================================
+        // Get all NFC registrations
+        const nfcList = await NFC.find()
+            .select(
+                "nfcId ownerId name course item status createdAt"
+            )
+            .sort({ createdAt: -1 });
 
-app.post(
-    "/api/admin/logout",
-    (req, res) => {
+        // Statistics
+        const total = nfcList.length;
 
-        res.setHeader(
-            "Set-Cookie",
-            `${ADMIN_COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`
+        const registered = nfcList.filter(
+            nfc =>
+                String(nfc.status).toLowerCase() ===
+                "registered"
+        ).length;
+
+        const available = nfcList.filter(
+            nfc =>
+                String(nfc.status).toLowerCase() ===
+                "available"
+        ).length;
+
+        // Send everything to Admin dashboard
+        res.json({
+            stats: {
+                total: total,
+                registered: registered,
+                available: available
+            },
+
+            users: nfcList,
+
+            owners: owners
+        });
+
+    } catch (error) {
+
+        console.error(
+            "Admin users error:",
+            error
         );
 
-        res.json({
-            message:
-                "Admin logged out."
+        res.status(500).json({
+            message: "Failed to fetch users.",
+            error: error.message
         });
-    }
-);
 
+    }
+});
 
 // =====================================================
 // OWNER LOGIN USING GMAIL

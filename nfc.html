@@ -1,68 +1,380 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tap N Found</title>
+
+    <title>Tap N Found - NFC</title>
+
+    <link rel="stylesheet" href="./style.css">
+
+    <style>
+        .nfc-page {
+            min-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .nfc-card {
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            border-radius: 20px;
+            padding: 35px;
+            box-shadow: 0 10px 35px rgba(0,0,0,0.10);
+            text-align: center;
+        }
+
+        .nfc-logo {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 20px;
+        }
+
+        .nfc-status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            background: #eaf6ff;
+        }
+
+        .nfc-details {
+            text-align: left;
+            margin-top: 25px;
+        }
+
+        .nfc-details div {
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .nfc-label {
+            font-weight: bold;
+        }
+
+        .chat-button {
+            display: inline-block;
+            width: 100%;
+            margin-top: 25px;
+            padding: 14px 25px;
+            background: #2864ee;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .chat-button:hover {
+            background: #1d50c7;
+        }
+
+        .chat-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .error {
+            color: #c62828;
+            background: #ffebee;
+        }
+
+        .success {
+            color: #176b35;
+            background: #e8f5e9;
+        }
+    </style>
 </head>
 
 <body>
 
-    <h1>Tap N Found</h1>
+    <header class="navbar">
+        <div class="nav-container">
 
-    <p id="status">Checking NFC...</p>
+            <a href="/" class="logo">
+                <span class="logo-main">TNF</span>
+                <span class="logo-text">Tap N Found</span>
+            </a>
+
+        </div>
+    </header>
+
+
+    <main class="nfc-page">
+
+        <div class="nfc-card">
+
+            <div class="nfc-logo">
+                TNF
+            </div>
+
+            <h1>Tap N Found</h1>
+
+            <div id="status" class="nfc-status">
+                Loading NFC information...
+            </div>
+
+
+            <div id="details" class="nfc-details" style="display:none;">
+
+                <div>
+                    <span class="nfc-label">NFC ID:</span>
+                    <span id="nfcId"></span>
+                </div>
+
+                <div>
+                    <span class="nfc-label">Item:</span>
+                    <span id="item"></span>
+                </div>
+
+                <div>
+                    <span class="nfc-label">Course:</span>
+                    <span id="course"></span>
+                </div>
+
+                <div>
+                    <span class="nfc-label">Status:</span>
+                    <span id="nfcStatus"></span>
+                </div>
+
+
+                <button
+                    id="chatButton"
+                    class="chat-button"
+                    type="button"
+                >
+                    Start Private Chat
+                </button>
+
+            </div>
+
+        </div>
+
+    </main>
+
 
     <script>
 
         // =====================================================
-        // GET NFC ID FROM URL
+        // BACKEND URL
+        // =====================================================
+        //
+        // Since you are testing server.js on localhost:
+        //
+        const API_URL = "https://tap-n-found.netlify.app/";
+        //
+        // This means:
+        // http://localhost:5000
+        //
+        // Later, when your backend is deployed, replace this
+        // with your deployed backend URL.
         // =====================================================
 
-        const parts = window.location.pathname.split("/");
-        const nfcId = parts[parts.length - 1];
+
+
+        // =====================================================
+        // GET NFC ID
+        // =====================================================
+        //
+        // Supports BOTH:
+        //
+        // 1. /nfc/TNF-MUXSHAHE
+        //
+        // 2. /nfc.html?nfcId=TNF-MUXSHAHE
+        //
+        // =====================================================
+
+        function getNfcIdFromUrl() {
+
+            // First check query parameter
+            const params =
+                new URLSearchParams(window.location.search);
+
+            const queryNfcId =
+                params.get("nfcId");
+
+            if (queryNfcId) {
+                return queryNfcId.trim();
+            }
+
+
+            // Then check URL path
+            const path =
+                window.location.pathname;
+
+            const match =
+                path.match(/^\/nfc\/([^\/]+)\/?$/i);
+
+            if (match && match[1]) {
+
+                return decodeURIComponent(
+                    match[1]
+                ).trim();
+
+            }
+
+
+            return null;
+        }
+
+
+
+        // =====================================================
+        // GET NFC ID
+        // =====================================================
+
+        const nfcId =
+            getNfcIdFromUrl();
+
+
+        // =====================================================
+        // ELEMENTS
+        // =====================================================
 
         const statusElement =
             document.getElementById("status");
 
+        const detailsElement =
+            document.getElementById("details");
+
+        const nfcIdElement =
+            document.getElementById("nfcId");
+
+        const itemElement =
+            document.getElementById("item");
+
+        const courseElement =
+            document.getElementById("course");
+
+        const nfcStatusElement =
+            document.getElementById("nfcStatus");
+
+        const chatButton =
+            document.getElementById("chatButton");
+
+
 
         // =====================================================
-        // IDENTIFY OWNER OR FINDER
+        // CHECK NFC ID
         // =====================================================
 
-        async function identifyUser() {
+        if (!nfcId) {
 
-            if (!nfcId || nfcId === "nfc") {
+            statusElement.textContent =
+                "NFC ID is missing.";
 
-                statusElement.textContent =
-                    "NFC ID is missing.";
+            statusElement.classList.add("error");
 
-                return;
-            }
+        } else {
+
+            console.log(
+                "TNF NFC ID detected:",
+                nfcId
+            );
+
+            loadNfc();
+
+        }
+
+
+
+        // =====================================================
+        // LOAD NFC
+        // =====================================================
+
+        async function loadNfc() {
 
             try {
 
                 statusElement.textContent =
                     "Checking NFC...";
 
-                const response = await fetch(
-                    `/api/nfc/${encodeURIComponent(nfcId)}/identify`,
-                    {
-                        method: "GET",
-                        credentials: "include"
-                    }
+
+                // Make sure ID starts with TNF-
+                if (
+                    !nfcId
+                        .toUpperCase()
+                        .startsWith("TNF-")
+                ) {
+
+                    throw new Error(
+                        "Invalid TNF NFC ID."
+                    );
+
+                }
+
+
+                console.log(
+                    "Calling identify API:",
+                    `${API_URL}/api/nfc/${encodeURIComponent(nfcId)}/identify`
                 );
 
-                const data = await response.json();
 
-                console.log("IDENTIFY RESPONSE:", data);
+                // =================================================
+                // IDENTIFY OWNER / FINDER
+                // =================================================
+
+                const response =
+                    await fetch(
+                        `${API_URL}/api/nfc/${encodeURIComponent(nfcId)}/identify`,
+                        {
+                            method: "GET",
+                            credentials: "include"
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                console.log(
+                    "Identify response:",
+                    data
+                );
+
 
                 if (!response.ok) {
 
                     throw new Error(
                         data.message ||
-                        "Unable to identify user."
+                        data.error ||
+                        "NFC not found."
                     );
+
                 }
+
+
+                // =================================================
+                // DISPLAY NFC INFORMATION
+                // =================================================
+
+                const nfc =
+                    data.nfc;
+
+
+                nfcIdElement.textContent =
+                    nfc.nfcId || nfcId;
+
+
+                itemElement.textContent =
+                    nfc.item || "Unknown";
+
+
+                courseElement.textContent =
+                    nfc.course || "Not available";
+
+
+                nfcStatusElement.textContent =
+                    nfc.status || "Unknown";
+
+
+                detailsElement.style.display =
+                    "block";
+
 
 
                 // =================================================
@@ -72,13 +384,33 @@
                 if (data.role === "owner") {
 
                     statusElement.textContent =
-                        "Owner detected.";
+                        "This NFC belongs to your account.";
 
-                    window.location.href =
-                        `/owner.html?nfcId=${encodeURIComponent(nfcId)}`;
+                    statusElement.classList.remove(
+                        "error"
+                    );
+
+                    statusElement.classList.add(
+                        "success"
+                    );
+
+
+                    chatButton.textContent =
+                        "Open Owner Dashboard";
+
+
+                    chatButton.onclick =
+                        function() {
+
+                            window.location.href =
+                                `/owner.html?nfcId=${encodeURIComponent(nfcId)}`;
+
+                        };
+
 
                     return;
                 }
+
 
 
                 // =================================================
@@ -88,147 +420,199 @@
                 if (data.role === "finder") {
 
                     statusElement.textContent =
-                        "Finder detected. Starting private chat...";
+                        "NFC sticker found. You can contact the owner.";
 
-                    await startFinderChat();
+                    statusElement.classList.remove(
+                        "error"
+                    );
+
+                    statusElement.classList.add(
+                        "success"
+                    );
+
+
+                    chatButton.textContent =
+                        "Start Private Chat";
+
+
+                    chatButton.onclick =
+                        startPrivateChat;
+
 
                     return;
                 }
 
 
+
+                // =================================================
+                // UNKNOWN ROLE
+                // =================================================
+
                 throw new Error(
-                    "Unable to determine whether you are the owner or finder."
+                    "Unable to determine NFC user role."
                 );
+
 
             } catch (error) {
 
                 console.error(
-                    "Identify error:",
+                    "NFC loading error:",
                     error
                 );
 
+
                 statusElement.textContent =
                     error.message ||
-                    "Something went wrong.";
+                    "Unable to load NFC information.";
+
+
+                statusElement.classList.remove(
+                    "success"
+                );
+
+
+                statusElement.classList.add(
+                    "error"
+                );
+
+
+                detailsElement.style.display =
+                    "none";
+
             }
+
         }
 
 
+
         // =====================================================
-        // START FINDER CHAT
+        // START PRIVATE CHAT
         // =====================================================
 
-        async function startFinderChat() {
+        async function startPrivateChat() {
 
             try {
 
-                const response = await fetch(
-                    "/api/chat/start",
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                        credentials: "include",
-
-                        body: JSON.stringify({
-                            nfcId: nfcId
-                        })
-                    }
-                );
+                chatButton.disabled =
+                    true;
 
 
-                const data =
-                    await response.json();
-
-                console.log(
-                    "CHAT START RESPONSE:",
-                    data
-                );
-
-
-                if (!response.ok) {
-
-                    throw new Error(
-                        data.message ||
-                        "Unable to start chat."
-                    );
-                }
-
-
-                // =================================================
-                // IMPORTANT VALIDATION
-                // =================================================
-
-                if (!data.chatId) {
-
-                    console.error(
-                        "Server did not return chatId.",
-                        data
-                    );
-
-                    throw new Error(
-                        "Chat ID was not created by the server."
-                    );
-                }
-
-
-                if (!data.finderToken) {
-
-                    console.error(
-                        "Server did not return finderToken.",
-                        data
-                    );
-
-                    throw new Error(
-                        "Finder chat token was not created."
-                    );
-                }
-
-
-                // =================================================
-                // OPEN FINDER CHAT
-                // =================================================
-
-                const chatUrl =
-                    `/chat.html?` +
-                    `nfcId=${encodeURIComponent(nfcId)}` +
-                    `&chatId=${encodeURIComponent(data.chatId)}` +
-                    `&role=finder` +
-                    `&token=${encodeURIComponent(data.finderToken)}`;
+                chatButton.textContent =
+                    "Creating private chat...";
 
 
                 console.log(
-                    "Opening chat:",
-                    chatUrl
+                    "Starting chat for:",
+                    nfcId
                 );
 
+
+                // =================================================
+                // IMPORTANT:
+                // Your server.js uses:
+                //
+                // POST /api/chat/start
+                //
+                // NOT /api/chat/create
+                // =================================================
+
+                const chatResponse =
+                    await fetch(
+                        `${API_URL}/api/chat/start`,
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            credentials:
+                                "include",
+
+                            body:
+                                JSON.stringify({
+                                    nfcId: nfcId
+                                })
+                        }
+                    );
+
+
+                const chatData =
+                    await chatResponse.json();
+
+
+                console.log(
+                    "Chat response:",
+                    chatData
+                );
+
+
+                if (!chatResponse.ok) {
+
+                    throw new Error(
+                        chatData.message ||
+                        chatData.error ||
+                        "Unable to create private chat."
+                    );
+
+                }
+
+
+
+                // =================================================
+                // MAKE SURE CHAT DATA EXISTS
+                // =================================================
+
+                if (
+                    !chatData.chatId ||
+                    !chatData.finderToken
+                ) {
+
+                    throw new Error(
+                        "Chat was created but chat access information is missing."
+                    );
+
+                }
+
+
+
+                // =================================================
+                // OPEN CHAT
+                // =================================================
 
                 window.location.href =
-                    chatUrl;
+                    `/chat.html` +
+                    `?nfcId=${encodeURIComponent(nfcId)}` +
+                    `&chatId=${encodeURIComponent(chatData.chatId)}` +
+                    `&role=finder` +
+                    `&token=${encodeURIComponent(chatData.finderToken)}`;
+
 
             } catch (error) {
 
                 console.error(
-                    "Start chat error:",
+                    "Chat error:",
                     error
                 );
 
-                statusElement.textContent =
+
+                alert(
                     error.message ||
-                    "Unable to start chat.";
+                    "Unable to start private chat."
+                );
+
+
+                chatButton.disabled =
+                    false;
+
+
+                chatButton.textContent =
+                    "Start Private Chat";
+
             }
+
         }
-
-
-        // =====================================================
-        // START
-        // =====================================================
-
-        identifyUser();
 
     </script>
 
