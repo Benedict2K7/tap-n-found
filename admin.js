@@ -2,16 +2,21 @@
 // TNF ADMIN DASHBOARD - admin.js
 // =====================================================
 
-
 // =====================================================
 // API BASE URL
 // =====================================================
 
-// PUT YOUR REAL BACKEND URL HERE
-// Example:
-// const API_URL = "https://tnf-backend.onrender.com";
+// Deployed backend (Render)
+const REMOTE_API_URL = "https://tap-n-found-backend.onrender.com";
 
-const API_URL =  "https://tap-n-found-backend.onrender.com";
+// Set to true ONLY if your local server at localhost:5000 proxies /api
+// to the backend (then no CORS is involved). Otherwise leave false.
+const USE_LOCAL_PROXY = false;
+
+const API_URL = USE_LOCAL_PROXY ? "" : REMOTE_API_URL;
+
+// Render free tier can take 30-60s to wake up
+const REQUEST_TIMEOUT_MS = 60000;
 
 
 // =====================================================
@@ -37,20 +42,28 @@ const availableUsers = document.getElementById("availableUsers");
 
 
 // =====================================================
-// CHECK API URL
+// HELPERS
 // =====================================================
 
-function checkApiUrl() {
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
-    if (
-        !API_URL ||
-        API_URL === "YOUR_BACKEND_URL"
-    ) {
-        throw new Error(
-            "Backend URL is not configured in admin.js."
-        );
+function setText(element, value) {
+    if (element) {
+        element.textContent = value;
     }
+}
 
+function checkApiUrl() {
+    if (!USE_LOCAL_PROXY && (!API_URL || API_URL === "YOUR_BACKEND_URL")) {
+        throw new Error("Backend URL is not configured in admin.js.");
+    }
 }
 
 
@@ -63,120 +76,76 @@ async function apiRequest(url, options = {}) {
     checkApiUrl();
 
     const controller = new AbortController();
-
-    const timeout = setTimeout(() => {
-        controller.abort();
-    }, 15000);
-
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
 
-        const response = await fetch(
-            `${API_URL}${url}`,
-            {
-                ...options,
-
-                credentials: "include",
-
-                signal: controller.signal,
-
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(options.headers || {})
-                }
+        const response = await fetch(`${API_URL}${url}`, {
+            ...options,
+            credentials: "include",
+            signal: controller.signal,
+            headers: {
+                "Content-Type": "application/json",
+                ...(options.headers || {})
             }
-        );
-
+        });
 
         const text = await response.text();
-
         let data = {};
 
-
         try {
-
-            data = text
-                ? JSON.parse(text)
-                : {};
-
+            data = text ? JSON.parse(text) : {};
         } catch {
-
-            throw new Error(
-                `Invalid server response (HTTP ${response.status})`
-            );
-
+            throw new Error(`Invalid server response (HTTP ${response.status})`);
         }
 
-
         if (!response.ok) {
-
             throw new Error(
                 data.message ||
                 data.error ||
                 `Request failed (HTTP ${response.status})`
             );
-
         }
-
 
         return data;
 
     } catch (error) {
 
         if (error.name === "AbortError") {
-
             throw new Error(
-                "Server request timed out. Check that the backend server is running."
+                "Server request timed out. The backend may be waking up or offline. Try again."
             );
+        }
 
+        // fetch() throws TypeError for network failures AND CORS blocks
+        if (error instanceof TypeError) {
+            throw new Error(
+                "Cannot reach the server. Check your internet, that the backend is running, " +
+                "and that its CORS settings allow " + window.location.origin + "."
+            );
         }
 
         throw error;
 
     } finally {
-
         clearTimeout(timeout);
-
     }
-
 }
 
 
 // =====================================================
-// SHOW LOGIN
+// SHOW / HIDE SECTIONS
 // =====================================================
 
 function showLogin() {
-
-    if (loginSection) {
-        loginSection.hidden = false;
-    }
-
-    if (dashboardSection) {
-        dashboardSection.hidden = true;
-    }
-
-    if (loginError) {
-        loginError.textContent = "";
-    }
-
+    if (loginSection) loginSection.hidden = false;
+    if (dashboardSection) dashboardSection.hidden = true;
+    setText(loginError, "");
 }
 
-
-// =====================================================
-// SHOW DASHBOARD
-// =====================================================
-
 function showDashboard() {
-
-    if (loginSection) {
-        loginSection.hidden = true;
-    }
-
-    if (dashboardSection) {
-        dashboardSection.hidden = false;
-    }
-
+    if (loginSection) loginSection.hidden = true;
+    if (dashboardSection) dashboardSection.hidden = false;
 }
 
 
@@ -186,143 +155,51 @@ function showDashboard() {
 
 if (loginForm) {
 
-    loginForm.addEventListener(
-        "submit",
-        async function (event) {
+    loginForm.addEventListener("submit", async function (event) {
 
-            event.preventDefault();
+        event.preventDefault();
+        setText(loginError, "");
 
+        const usernameElement = document.getElementById("username");
+        const passwordElement = document.getElementById("password");
 
-            if (loginError) {
-                loginError.textContent = "";
-            }
+        const username = usernameElement ? usernameElement.value.trim() : "";
+        const password = passwordElement ? passwordElement.value : "";
 
+        if (!username || !password) {
+            setText(loginError, "Please enter username and password.");
+            return;
+        }
 
-            const usernameElement =
-                document.getElementById("username");
+        if (loginButton) loginButton.disabled = true;
+        setText(loginText, "Logging in...");
 
-            const passwordElement =
-                document.getElementById("password");
+        try {
 
+            const result = await apiRequest("/api/admin/login", {
+                method: "POST",
+                body: JSON.stringify({ username, password })
+            });
 
-            const username =
-                usernameElement
-                    ? usernameElement.value.trim()
-                    : "";
+            console.log("Admin login response:", result);
 
+            showDashboard();
+            loginForm.reset();
 
-            const password =
-                passwordElement
-                    ? passwordElement.value
-                    : "";
+            await loadUsers();
 
+        } catch (error) {
 
-            // -----------------------------------------
-            // VALIDATION
-            // -----------------------------------------
+            console.error("Admin login error:", error);
+            setText(loginError, error.message || "Login failed.");
 
-            if (!username || !password) {
+        } finally {
 
-                if (loginError) {
-                    loginError.textContent =
-                        "Please enter username and password.";
-                }
-
-                return;
-            }
-
-
-            // -----------------------------------------
-            // BUTTON LOADING
-            // -----------------------------------------
-
-            if (loginButton) {
-                loginButton.disabled = true;
-            }
-
-            if (loginText) {
-                loginText.textContent = "Logging in...";
-            }
-
-
-            try {
-
-                // -------------------------------------
-                // ADMIN LOGIN
-                // -------------------------------------
-
-                const result = await apiRequest(
-                    "/api/admin/login",
-                    {
-                        method: "POST",
-
-                        body: JSON.stringify({
-                            username: username,
-                            password: password
-                        })
-                    }
-                );
-
-
-                console.log(
-                    "Admin login response:",
-                    result
-                );
-
-
-                // -------------------------------------
-                // SHOW DASHBOARD
-                // -------------------------------------
-
-                showDashboard();
-
-
-                // -------------------------------------
-                // CLEAR LOGIN FORM
-                // -------------------------------------
-
-                if (loginForm) {
-                    loginForm.reset();
-                }
-
-
-                // -------------------------------------
-                // LOAD NFC REGISTRATIONS
-                // -------------------------------------
-
-                await loadUsers();
-
-            } catch (error) {
-
-                console.error(
-                    "Admin login error:",
-                    error
-                );
-
-
-                if (loginError) {
-
-                    loginError.textContent =
-                        error.message ||
-                        "Login failed.";
-
-                }
-
-            } finally {
-
-                if (loginButton) {
-                    loginButton.disabled = false;
-                }
-
-                if (loginText) {
-                    loginText.textContent = "Login";
-                }
-
-            }
+            if (loginButton) loginButton.disabled = false;
+            setText(loginText, "Login");
 
         }
-    );
-
+    });
 }
 
 
@@ -330,254 +207,93 @@ if (loginForm) {
 // LOAD NFC REGISTRATIONS
 // =====================================================
 
+function extractList(result) {
+    if (Array.isArray(result)) return result;
+    if (result && Array.isArray(result.data)) return result.data;
+    if (result && Array.isArray(result.users)) return result.users;
+    if (result && Array.isArray(result.nfc)) return result.nfc;
+    return [];
+}
+
+function countByStatus(users, status) {
+    return users.filter(
+        user => String(user.status || "").toLowerCase() === status
+    ).length;
+}
+
 async function loadUsers() {
 
-    console.log(
-        "Loading NFC registrations..."
-    );
-
-
     if (!usersTableBody) {
-
-        console.error(
-            "usersTableBody element not found."
-        );
-
+        console.error("usersTableBody element not found.");
         return;
     }
 
-
-    // -----------------------------------------
-    // LOADING MESSAGE
-    // -----------------------------------------
-
     usersTableBody.innerHTML = `
         <tr>
-            <td colspan="6" class="loading">
-                Loading NFC registrations...
-            </td>
+            <td colspan="6" class="loading">Loading NFC registrations...</td>
         </tr>
     `;
 
-
     try {
 
-        // -----------------------------------------
-        // GET NFC DATA
-        // -----------------------------------------
+        const result = await apiRequest("/api/nfc/all");
+        console.log("NFC API response:", result);
 
-        const result =
-            await apiRequest(
-                "/api/nfc/all"
-            );
+        const users = extractList(result);
 
-
-        console.log(
-            "NFC API response:",
-            result
-        );
-
-
-        // -----------------------------------------
-        // MAKE SURE RESPONSE IS ARRAY
-        // -----------------------------------------
-
-        const users =
-            Array.isArray(result)
-                ? result
-                : [];
-
-
-        console.log(
-            "NFC users:",
-            users
-        );
-
-
-        // -----------------------------------------
-        // STATISTICS
-        // -----------------------------------------
-
-        const total =
-            users.length;
-
-
-        const registered =
-            users.filter(
-                user =>
-                    String(
-                        user.status || ""
-                    ).toLowerCase() ===
-                    "registered"
-            ).length;
-
-
-        const available =
-            users.filter(
-                user =>
-                    String(
-                        user.status || ""
-                    ).toLowerCase() ===
-                    "available"
-            ).length;
-
-
-        // -----------------------------------------
-        // DISPLAY STATISTICS
-        // -----------------------------------------
-
-        if (totalUsers) {
-
-            totalUsers.textContent =
-                total;
-
-        }
-
-
-        if (registeredUsers) {
-
-            registeredUsers.textContent =
-                registered;
-
-        }
-
-
-        if (availableUsers) {
-
-            availableUsers.textContent =
-                available;
-
-        }
-
-
-        // -----------------------------------------
-        // NO NFC RECORDS
-        // -----------------------------------------
+        setText(totalUsers, users.length);
+        setText(registeredUsers, countByStatus(users, "registered"));
+        setText(availableUsers, countByStatus(users, "available"));
 
         if (users.length === 0) {
-
             usersTableBody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="loading">
-                        No NFC registrations found.
-                    </td>
+                    <td colspan="6" class="loading">No NFC registrations found.</td>
                 </tr>
             `;
-
             return;
         }
 
+        usersTableBody.innerHTML = users.map(user => {
 
-        // -----------------------------------------
-        // DISPLAY NFC REGISTRATIONS
-        // -----------------------------------------
+            const date = user.createdAt
+                ? new Date(user.createdAt).toLocaleString()
+                : "-";
 
-        usersTableBody.innerHTML =
-            users.map(
-                user => {
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(user.nfcId || "-")}</strong></td>
+                    <td>${escapeHtml(user.name || "-")}</td>
+                    <td>${escapeHtml(user.course || "-")}</td>
+                    <td>${escapeHtml(user.item || "-")}</td>
+                    <td><span class="status">${escapeHtml(user.status || "-")}</span></td>
+                    <td>${escapeHtml(date)}</td>
+                </tr>
+            `;
 
-                    const date =
-                        user.createdAt
-                            ? new Date(
-                                user.createdAt
-                            ).toLocaleString()
-                            : "-";
-
-
-                    const nfcId =
-                        user.nfcId ||
-                        "-";
-
-
-                    const name =
-                        user.name ||
-                        "-";
-
-
-                    const course =
-                        user.course ||
-                        "-";
-
-
-                    const item =
-                        user.item ||
-                        "-";
-
-
-                    const status =
-                        user.status ||
-                        "-";
-
-
-                    return `
-                        <tr>
-
-                            <td>
-                                <strong>
-                                    ${escapeHtml(nfcId)}
-                                </strong>
-                            </td>
-
-                            <td>
-                                ${escapeHtml(name)}
-                            </td>
-
-                            <td>
-                                ${escapeHtml(course)}
-                            </td>
-
-                            <td>
-                                ${escapeHtml(item)}
-                            </td>
-
-                            <td>
-                                <span class="status">
-                                    ${escapeHtml(status)}
-                                </span>
-                            </td>
-
-                            <td>
-                                ${escapeHtml(date)}
-                            </td>
-
-                        </tr>
-                    `;
-
-                }
-            ).join("");
-
+        }).join("");
 
     } catch (error) {
 
-        console.error(
-            "Load NFC registrations error:",
-            error
-        );
+        console.error("Load NFC registrations error:", error);
 
+        setText(totalUsers, "0");
+        setText(registeredUsers, "0");
+        setText(availableUsers, "0");
 
-        if (totalUsers) {
-            totalUsers.textContent = "0";
+        // If the session expired, go back to login
+        if (/401|403|unauthor|not authenticated/i.test(error.message)) {
+            showLogin();
+            setText(loginError, "Session expired. Please log in again.");
+            return;
         }
-
-        if (registeredUsers) {
-            registeredUsers.textContent = "0";
-        }
-
-        if (availableUsers) {
-            availableUsers.textContent = "0";
-        }
-
 
         usersTableBody.innerHTML = `
             <tr>
-                <td colspan="6" class="loading">
-                    ${escapeHtml(error.message)}
-                </td>
+                <td colspan="6" class="loading">${escapeHtml(error.message)}</td>
             </tr>
         `;
-
     }
-
 }
 
 
@@ -587,34 +303,16 @@ async function loadUsers() {
 
 if (logoutButton) {
 
-    logoutButton.addEventListener(
-        "click",
-        async function () {
+    logoutButton.addEventListener("click", async function () {
 
-            try {
-
-                await apiRequest(
-                    "/api/admin/logout",
-                    {
-                        method: "POST"
-                    }
-                );
-
-            } catch (error) {
-
-                console.error(
-                    "Logout error:",
-                    error
-                );
-
-            }
-
-
-            showLogin();
-
+        try {
+            await apiRequest("/api/admin/logout", { method: "POST" });
+        } catch (error) {
+            console.error("Logout error:", error);
         }
-    );
 
+        showLogin();
+    });
 }
 
 
@@ -624,49 +322,18 @@ if (logoutButton) {
 
 if (refreshButton) {
 
-    refreshButton.addEventListener(
-        "click",
-        async function () {
+    refreshButton.addEventListener("click", async function () {
 
-            refreshButton.disabled = true;
+        refreshButton.disabled = true;
 
-
-            try {
-
-                await loadUsers();
-
-            } catch (error) {
-
-                console.error(
-                    "Refresh error:",
-                    error
-                );
-
-            } finally {
-
-                refreshButton.disabled = false;
-
-            }
-
+        try {
+            await loadUsers();
+        } catch (error) {
+            console.error("Refresh error:", error);
+        } finally {
+            refreshButton.disabled = false;
         }
-    );
-
-}
-
-
-// =====================================================
-// HTML ESCAPE
-// =====================================================
-
-function escapeHtml(value) {
-
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-
+    });
 }
 
 
@@ -678,46 +345,22 @@ async function checkAdminSession() {
 
     try {
 
-        const result =
-            await apiRequest(
-                "/api/admin/me"
-            );
+        const result = await apiRequest("/api/admin/me");
+        console.log("Admin session:", result);
 
-
-        console.log(
-            "Admin session:",
-            result
-        );
-
-
-        if (
-            result &&
-            result.authenticated === true
-        ) {
-
+        if (result && result.authenticated === true) {
             showDashboard();
-
             await loadUsers();
-
             return;
         }
 
-
         showLogin();
-
 
     } catch (error) {
 
-        console.error(
-            "Session check error:",
-            error
-        );
-
-
+        console.error("Session check error:", error);
         showLogin();
-
     }
-
 }
 
 
@@ -725,11 +368,4 @@ async function checkAdminSession() {
 // START ADMIN PAGE
 // =====================================================
 
-document.addEventListener(
-    "DOMContentLoaded",
-    function () {
-
-        checkAdminSession();
-
-    }
-);
+document.addEventListener("DOMContentLoaded", checkAdminSession);
