@@ -6,12 +6,13 @@
 // API BASE URL
 // =====================================================
 
-// Deployed backend (Render)
+// Your BACKEND (Render) URL - NOT the Netlify URL
 const REMOTE_API_URL = "https://tap-n-found-backend.onrender.com";
 
-// Set to true ONLY if your local server at localhost:5000 proxies /api
-// to the backend (then no CORS is involved). Otherwise leave false.
-const USE_LOCAL_PROXY = false;
+// true  = call /api/... on the same domain (Netlify forwards it to the
+//         backend using the _redirects file). No CORS needed.
+// false = call REMOTE_API_URL directly (backend must allow CORS).
+const USE_LOCAL_PROXY = true;
 
 const API_URL = USE_LOCAL_PROXY ? "" : REMOTE_API_URL;
 
