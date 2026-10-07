@@ -11,7 +11,6 @@
 // Example:
 // const API_URL = "https://tnf-backend.onrender.com";
 
-const API_URL =  "https://tap-n-found-backend.onrender.com";
 
 
 // =====================================================
