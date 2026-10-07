@@ -1,19 +1,16 @@
 // =====================================================
-// TAP N FOUND - ADMIN DASHBOARD
+// TNF ADMIN DASHBOARD
 // =====================================================
 
 // IMPORTANT:
-// If your backend is running on localhost:
-//     http://localhost:5000
+// Change this ONE line after deploying your server.js.
 //
-// If your backend is deployed online:
-//     put your deployed backend URL here.
+// Local backend:
+// http://localhost:5000
 //
-// Example:
-// const API_BASE_URL = "https://your-backend.onrender.com";
+// Example deployed backend:
+// https://tnf-backend.onrender.com
 //
-// DO NOT put /api at the end.
-
 const API_BASE_URL = "http://localhost:5000";
 
 
@@ -50,7 +47,6 @@ function getApiUrl(endpoint) {
     }
 
     return API_BASE_URL.replace(/\/$/, "") + endpoint;
-
 }
 
 
@@ -66,29 +62,24 @@ async function apiRequest(endpoint, options = {}) {
         controller.abort();
     }, 15000);
 
-
     try {
 
-        const url = getApiUrl(endpoint);
+        const response = await fetch(
+            getApiUrl(endpoint),
+            {
+                ...options,
 
-        console.log("API Request:", url);
+                // Important for admin session cookie
+                credentials: "include",
 
+                signal: controller.signal,
 
-        const response = await fetch(url, {
-
-            ...options,
-
-            credentials: "include",
-
-            signal: controller.signal,
-
-            headers: {
-                "Content-Type": "application/json",
-
-                ...(options.headers || {})
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(options.headers || {})
+                }
             }
-
-        });
+        );
 
 
         const text = await response.text();
@@ -96,6 +87,7 @@ async function apiRequest(endpoint, options = {}) {
         let data = {};
 
 
+        // Try to read JSON
         try {
 
             data = text
@@ -111,14 +103,13 @@ async function apiRequest(endpoint, options = {}) {
         }
 
 
+        // HTTP error
         if (!response.ok) {
 
             throw new Error(
-
                 data.message ||
                 data.error ||
                 `Request failed (HTTP ${response.status})`
-
             );
 
         }
@@ -126,14 +117,7 @@ async function apiRequest(endpoint, options = {}) {
 
         return data;
 
-
     } catch (error) {
-
-        console.error(
-            "API request error:",
-            error
-        );
-
 
         if (error.name === "AbortError") {
 
@@ -144,9 +128,10 @@ async function apiRequest(endpoint, options = {}) {
         }
 
 
+        // Browser network error
         if (
             error instanceof TypeError &&
-            error.message.toLowerCase().includes("fetch")
+            error.message === "Failed to fetch"
         ) {
 
             throw new Error(
@@ -157,7 +142,6 @@ async function apiRequest(endpoint, options = {}) {
 
 
         throw error;
-
 
     } finally {
 
@@ -174,17 +158,11 @@ async function apiRequest(endpoint, options = {}) {
 
 function showLogin() {
 
-    if (loginSection) {
-        loginSection.hidden = false;
-    }
+    loginSection.hidden = false;
 
-    if (dashboardSection) {
-        dashboardSection.hidden = true;
-    }
+    dashboardSection.hidden = true;
 
-    if (loginError) {
-        loginError.textContent = "";
-    }
+    loginError.textContent = "";
 
 }
 
@@ -195,13 +173,9 @@ function showLogin() {
 
 function showDashboard() {
 
-    if (loginSection) {
-        loginSection.hidden = true;
-    }
+    loginSection.hidden = true;
 
-    if (dashboardSection) {
-        dashboardSection.hidden = false;
-    }
+    dashboardSection.hidden = false;
 
 }
 
@@ -210,128 +184,127 @@ function showDashboard() {
 // LOGIN
 // =====================================================
 
-if (loginForm) {
+loginForm.addEventListener(
+    "submit",
+    async function (event) {
 
-    loginForm.addEventListener(
-        "submit",
-        async function (event) {
+        event.preventDefault();
 
-            event.preventDefault();
-
-
-            if (loginError) {
-                loginError.textContent = "";
-            }
+        loginError.textContent = "";
 
 
-            const usernameElement =
-                document.getElementById("username");
-
-            const passwordElement =
-                document.getElementById("password");
-
-
-            const username =
-                usernameElement
-                    ? usernameElement.value.trim()
-                    : "";
+        const username =
+            document
+                .getElementById("username")
+                .value
+                .trim();
 
 
-            const password =
-                passwordElement
-                    ? passwordElement.value
-                    : "";
+        const password =
+            document
+                .getElementById("password")
+                .value;
 
 
-            if (!username || !password) {
+        // Check fields
+        if (!username || !password) {
 
-                if (loginError) {
+            loginError.textContent =
+                "Please enter username and password.";
 
-                    loginError.textContent =
-                        "Please enter username and password.";
-
-                }
-
-                return;
-
-            }
-
-
-            if (loginButton) {
-                loginButton.disabled = true;
-            }
-
-            if (loginText) {
-                loginText.textContent = "Logging in...";
-            }
-
-
-            try {
-
-                const result =
-                    await apiRequest(
-                        "/api/admin/login",
-                        {
-                            method: "POST",
-
-                            body: JSON.stringify({
-                                username,
-                                password
-                            })
-                        }
-                    );
-
-
-                console.log(
-                    "Admin login response:",
-                    result
-                );
-
-
-                showDashboard();
-
-
-                if (loginForm) {
-                    loginForm.reset();
-                }
-
-
-                await loadUsers();
-
-
-            } catch (error) {
-
-                console.error(
-                    "Admin login error:",
-                    error
-                );
-
-
-                if (loginError) {
-
-                    loginError.textContent =
-                        error.message ||
-                        "Login failed.";
-
-                }
-
-
-            } finally {
-
-                if (loginButton) {
-                    loginButton.disabled = false;
-                }
-
-                if (loginText) {
-                    loginText.textContent = "Login";
-                }
-
-            }
+            return;
 
         }
-    );
 
-}
+
+        // Disable button
+        loginButton.disabled = true;
+
+        loginText.textContent = "Logging in...";
+
+
+        try {
+
+            // =================================================
+            // ADMIN LOGIN
+            // =================================================
+
+            const result =
+                await apiRequest(
+                    "/api/admin/login",
+                    {
+                        method: "POST",
+
+                        body: JSON.stringify({
+                            username: username,
+                            password: password
+                        })
+                    }
+                );
+
+
+            console.log(
+                "Admin login response:",
+                result
+            );
+
+
+            // =================================================
+            // CHECK SESSION AFTER LOGIN
+            // =================================================
+
+            const session =
+                await apiRequest(
+                    "/api/admin/me"
+                );
+
+
+            if (
+                !session ||
+                session.authenticated !== true
+            ) {
+
+                throw new Error(
+                    "Login succeeded, but the admin session could not be created."
+                );
+
+            }
+
+
+            // Show dashboard
+            showDashboard();
+
+
+            // Reset login
+            loginForm.reset();
+
+
+            // Load users
+            await loadUsers();
+
+
+        } catch (error) {
+
+            console.error(
+                "Admin login error:",
+                error
+            );
+
+
+            loginError.textContent =
+                error.message ||
+                "Login failed.";
+
+        } finally {
+
+            loginButton.disabled = false;
+
+            loginText.textContent = "Login";
+
+        }
+
+    }
+);
 
 
 // =====================================================
@@ -339,11 +312,6 @@ if (loginForm) {
 // =====================================================
 
 async function loadUsers() {
-
-    if (!usersTableBody) {
-        return;
-    }
-
 
     usersTableBody.innerHTML = `
         <tr>
@@ -363,51 +331,92 @@ async function loadUsers() {
 
 
         console.log(
-            "Users response:",
+            "Admin users response:",
             result
         );
 
 
-        const stats =
-            result.stats || {};
+        // =================================================
+        // YOUR CURRENT SERVER RETURNS AN ARRAY
+        //
+        // Example:
+        //
+        // [
+        //   {
+        //      name: "...",
+        //      email: "...",
+        //      course: "...",
+        //      createdAt: "..."
+        //   }
+        // ]
+        //
+        // This code also supports:
+        //
+        // {
+        //    users: [...]
+        // }
+        // =================================================
+
+        let users = [];
 
 
-        const users =
+        if (Array.isArray(result)) {
+
+            users = result;
+
+        } else if (
+            result &&
             Array.isArray(result.users)
-                ? result.users
-                : [];
+        ) {
 
-
-        if (totalUsers) {
-
-            totalUsers.textContent =
-                stats.total ?? users.length;
+            users = result.users;
 
         }
 
 
-        if (registeredUsers) {
+        // =================================================
+        // STATS
+        // =================================================
 
-            registeredUsers.textContent =
-                stats.registered ?? 0;
+        let stats = {};
+
+
+        if (
+            result &&
+            !Array.isArray(result) &&
+            result.stats
+        ) {
+
+            stats = result.stats;
 
         }
 
 
-        if (availableUsers) {
+        totalUsers.textContent =
+            stats.total ??
+            users.length;
 
-            availableUsers.textContent =
-                stats.available ?? 0;
 
-        }
+        registeredUsers.textContent =
+            stats.registered ??
+            users.length;
 
+
+        availableUsers.textContent =
+            stats.available ??
+            0;
+
+
+        // =================================================
+        // NO USERS
+        // =================================================
 
         if (users.length === 0) {
 
             usersTableBody.innerHTML = `
                 <tr>
                     <td colspan="6" class="loading">
-                        No NFC registrations found.
+                        No registered users found.
                     </td>
                 </tr>
             `;
@@ -417,64 +426,87 @@ async function loadUsers() {
         }
 
 
+        // =================================================
+        // CREATE TABLE
+        // =================================================
+
         usersTableBody.innerHTML =
-            users.map(user => {
+            users
+                .map(function (user) {
 
-                const date =
-                    user.createdAt
-                        ? new Date(
-                            user.createdAt
-                        ).toLocaleString()
-                        : "-";
+                    const date =
+                        user.createdAt
+                            ? new Date(
+                                user.createdAt
+                            ).toLocaleString()
+                            : "-";
 
 
-                return `
-                    <tr>
+                    // Your current /api/admin/users
+                    // returns Owner information.
+                    //
+                    // NFC fields may not exist yet.
+                    const nfcId =
+                        user.nfcId ||
+                        "-";
 
-                        <td>
-                            <strong>
-                                ${escapeHtml(
-                                    user.nfcId
-                                )}
-                            </strong>
-                        </td>
 
-                        <td>
-                            ${escapeHtml(
-                                user.name
-                            )}
-                        </td>
+                    const name =
+                        user.name ||
+                        "-";
 
-                        <td>
-                            ${escapeHtml(
-                                user.course
-                            )}
-                        </td>
 
-                        <td>
-                            ${escapeHtml(
-                                user.item
-                            )}
-                        </td>
+                    const course =
+                        user.course ||
+                        "-";
 
-                        <td>
-                            <span class="status">
-                                ${escapeHtml(
-                                    user.status
-                                )}
-                            </span>
-                        </td>
 
-                        <td>
-                            ${escapeHtml(
-                                date
-                            )}
-                        </td>
+                    const item =
+                        user.item ||
+                        "-";
 
-                    </tr>
-                `;
 
-            }).join("");
+                    const status =
+                        user.status ||
+                        "registered";
+
+
+                    return `
+                        <tr>
+
+                            <td>
+                                <strong>
+                                    ${escapeHtml(nfcId)}
+                                </strong>
+                            </td>
+
+                            <td>
+                                ${escapeHtml(name)}
+                            </td>
+
+                            <td>
+                                ${escapeHtml(course)}
+                            </td>
+
+                            <td>
+                                ${escapeHtml(item)}
+                            </td>
+
+                            <td>
+                                <span class="status">
+                                    ${escapeHtml(status)}
+                                </span>
+                            </td>
+
+                            <td>
+                                ${escapeHtml(date)}
+                            </td>
+
+                        </tr>
+                    `;
+
+                })
+                .join("");
 
 
     } catch (error) {
@@ -488,9 +520,7 @@ async function loadUsers() {
         usersTableBody.innerHTML = `
             <tr>
                 <td colspan="6" class="loading">
-                    ${escapeHtml(
-                        error.message
-                    )}
+                    ${escapeHtml(error.message)}
                 </td>
             </tr>
         `;
@@ -504,55 +534,65 @@ async function loadUsers() {
 // LOGOUT
 // =====================================================
 
-if (logoutButton) {
+logoutButton.addEventListener(
+    "click",
+    async function () {
 
-    logoutButton.addEventListener(
-        "click",
-        async function () {
+        logoutButton.disabled = true;
 
-            try {
 
-                await apiRequest(
-                    "/api/admin/logout",
-                    {
-                        method: "POST"
-                    }
-                );
+        try {
 
-            } catch (error) {
+            await apiRequest(
+                "/api/admin/logout",
+                {
+                    method: "POST"
+                }
+            );
 
-                console.error(
-                    "Logout error:",
-                    error
-                );
 
-            }
+        } catch (error) {
 
+            console.error(
+                "Logout error:",
+                error
+            );
+
+        } finally {
+
+            logoutButton.disabled = false;
 
             showLogin();
 
         }
-    );
 
-}
+    }
+);
 
 
 // =====================================================
 // REFRESH
 // =====================================================
 
-if (refreshButton) {
+refreshButton.addEventListener(
+    "click",
+    async function () {
 
-    refreshButton.addEventListener(
-        "click",
-        async function () {
+        refreshButton.disabled = true;
+
+
+        try {
 
             await loadUsers();
 
-        }
-    );
+        } finally {
 
-}
+            refreshButton.disabled = false;
+
+        }
+
+    }
+);
 
 
 // =====================================================
@@ -562,37 +602,17 @@ if (refreshButton) {
 function escapeHtml(value) {
 
     return String(value ?? "")
-
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-
-        .replace(
-            /</g,
-            "&lt;"
-        )
-
-        .replace(
-            />/g,
-            "&gt;"
-        )
-
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-
-        .replace(
-            /'/g,
-            "&#039;"
-        );
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 
 }
 
 
 // =====================================================
-// CHECK ADMIN SESSION
+// CHECK EXISTING ADMIN SESSION
 // =====================================================
 
 async function checkAdminSession() {
@@ -631,7 +651,7 @@ async function checkAdminSession() {
     } catch (error) {
 
         console.error(
-            "Admin session check error:",
+            "Session check error:",
             error
         );
 
@@ -644,14 +664,88 @@ async function checkAdminSession() {
 
 
 // =====================================================
+// TEST BACKEND CONNECTION
+// =====================================================
+
+async function testBackendConnection() {
+
+    try {
+
+        const result =
+            await apiRequest(
+                "/api/health"
+            );
+
+
+        console.log(
+            "Backend health:",
+            result
+        );
+
+
+        return true;
+
+    } catch (error) {
+
+        console.error(
+            "Backend connection failed:",
+            error
+        );
+
+
+        return false;
+
+    }
+
+}
+
+
+// =====================================================
+// START ADMIN PAGE
+// =====================================================
+
+async function startAdminPage() {
+
+    console.log(
+        "TNF Admin Dashboard starting..."
+    );
+
+
+    console.log(
+        "Backend URL:",
+        API_BASE_URL
+    );
+
+
+    // First check backend
+    const backendOnline =
+        await testBackendConnection();
+
+
+    if (!backendOnline) {
+
+        console.error(
+            "TNF backend is not reachable."
+        );
+
+        showLogin();
+
+        loginError.textContent =
+            "Unable to connect to the backend server.";
+
+        return;
+
+    }
+
+
+    // Check admin login
+    await checkAdminSession();
+
+}
+
+
+// =====================================================
 // START
 // =====================================================
 
-document.addEventListener(
-    "DOMContentLoaded",
-    function () {
-
-        checkAdminSession();
-
-    }
-);
+startAdminPage();
