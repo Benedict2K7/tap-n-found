@@ -1,3 +1,26 @@
+// =====================================================
+// TAP N FOUND - ADMIN DASHBOARD
+// =====================================================
+
+// IMPORTANT:
+// If your backend is running on localhost:
+//     http://localhost:5000
+//
+// If your backend is deployed online:
+//     put your deployed backend URL here.
+//
+// Example:
+// const API_BASE_URL = "https://your-backend.onrender.com";
+//
+// DO NOT put /api at the end.
+
+const API_BASE_URL = "http://localhost:5000";
+
+
+// =====================================================
+// DOM ELEMENTS
+// =====================================================
+
 const loginSection = document.getElementById("loginSection");
 const dashboardSection = document.getElementById("dashboardSection");
 
@@ -17,10 +40,25 @@ const availableUsers = document.getElementById("availableUsers");
 
 
 // =====================================================
+// API URL HELPER
+// =====================================================
+
+function getApiUrl(endpoint) {
+
+    if (!endpoint.startsWith("/")) {
+        endpoint = "/" + endpoint;
+    }
+
+    return API_BASE_URL.replace(/\/$/, "") + endpoint;
+
+}
+
+
+// =====================================================
 // API REQUEST
 // =====================================================
 
-async function apiRequest(url, options = {}) {
+async function apiRequest(endpoint, options = {}) {
 
     const controller = new AbortController();
 
@@ -28,57 +66,105 @@ async function apiRequest(url, options = {}) {
         controller.abort();
     }, 15000);
 
+
     try {
 
+        const url = getApiUrl(endpoint);
+
+        console.log("API Request:", url);
+
+
         const response = await fetch(url, {
+
             ...options,
+
             credentials: "include",
+
             signal: controller.signal,
+
             headers: {
                 "Content-Type": "application/json",
+
                 ...(options.headers || {})
             }
+
         });
+
 
         const text = await response.text();
 
         let data = {};
 
+
         try {
-            data = text ? JSON.parse(text) : {};
+
+            data = text
+                ? JSON.parse(text)
+                : {};
+
         } catch {
+
             throw new Error(
                 `Invalid server response (HTTP ${response.status})`
             );
+
         }
+
 
         if (!response.ok) {
 
             throw new Error(
+
                 data.message ||
                 data.error ||
                 `Request failed (HTTP ${response.status})`
+
             );
 
         }
+
 
         return data;
 
+
     } catch (error) {
 
+        console.error(
+            "API request error:",
+            error
+        );
+
+
         if (error.name === "AbortError") {
+
             throw new Error(
-                "Server request timed out. Check that the server is running."
+                "Server request timed out. Check that the backend server is running."
             );
+
         }
 
+
+        if (
+            error instanceof TypeError &&
+            error.message.toLowerCase().includes("fetch")
+        ) {
+
+            throw new Error(
+                "Unable to connect to the backend server. Check the API URL, server status, and CORS settings."
+            );
+
+        }
+
+
         throw error;
+
 
     } finally {
 
         clearTimeout(timeout);
 
     }
+
 }
 
 
@@ -88,10 +174,17 @@ async function apiRequest(url, options = {}) {
 
 function showLogin() {
 
-    loginSection.hidden = false;
-    dashboardSection.hidden = true;
+    if (loginSection) {
+        loginSection.hidden = false;
+    }
 
-    loginError.textContent = "";
+    if (dashboardSection) {
+        dashboardSection.hidden = true;
+    }
+
+    if (loginError) {
+        loginError.textContent = "";
+    }
 
 }
 
@@ -102,8 +195,13 @@ function showLogin() {
 
 function showDashboard() {
 
-    loginSection.hidden = true;
-    dashboardSection.hidden = false;
+    if (loginSection) {
+        loginSection.hidden = true;
+    }
+
+    if (dashboardSection) {
+        dashboardSection.hidden = false;
+    }
 
 }
 
@@ -112,90 +210,128 @@ function showDashboard() {
 // LOGIN
 // =====================================================
 
-loginForm.addEventListener("submit", async function (event) {
+if (loginForm) {
 
-    event.preventDefault();
+    loginForm.addEventListener(
+        "submit",
+        async function (event) {
 
-    loginError.textContent = "";
-
-    const username =
-        document.getElementById("username").value.trim();
-
-    const password =
-        document.getElementById("password").value;
+            event.preventDefault();
 
 
-    if (!username || !password) {
-
-        loginError.textContent =
-            "Please enter username and password.";
-
-        return;
-
-    }
+            if (loginError) {
+                loginError.textContent = "";
+            }
 
 
-    loginButton.disabled = true;
-    loginText.textContent = "Logging...";
+            const usernameElement =
+                document.getElementById("username");
+
+            const passwordElement =
+                document.getElementById("password");
 
 
-    try {
+            const username =
+                usernameElement
+                    ? usernameElement.value.trim()
+                    : "";
 
-        // Login only
-        const result =
-            await apiRequest(
-                "/api/admin/login",
-                {
-                    method: "POST",
 
-                    body: JSON.stringify({
-                        username,
-                        password
-                    })
+            const password =
+                passwordElement
+                    ? passwordElement.value
+                    : "";
+
+
+            if (!username || !password) {
+
+                if (loginError) {
+
+                    loginError.textContent =
+                        "Please enter username and password.";
+
                 }
-            );
+
+                return;
+
+            }
 
 
-        console.log(
-            "Login response:",
-            result
-        );
+            if (loginButton) {
+                loginButton.disabled = true;
+            }
+
+            if (loginText) {
+                loginText.textContent = "Logging in...";
+            }
 
 
-        // Open dashboard immediately
-        showDashboard();
+            try {
+
+                const result =
+                    await apiRequest(
+                        "/api/admin/login",
+                        {
+                            method: "POST",
+
+                            body: JSON.stringify({
+                                username,
+                                password
+                            })
+                        }
+                    );
 
 
-        // Reset login button
-        loginButton.disabled = false;
-        loginText.textContent = "Login";
-
-        loginForm.reset();
-
-
-        // Load users separately
-        loadUsers();
+                console.log(
+                    "Admin login response:",
+                    result
+                );
 
 
-    } catch (error) {
-
-        console.error(
-            "Admin login error:",
-            error
-        );
+                showDashboard();
 
 
-        loginError.textContent =
-            error.message ||
-            "Login failed.";
+                if (loginForm) {
+                    loginForm.reset();
+                }
 
 
-        loginButton.disabled = false;
-        loginText.textContent = "Login";
+                await loadUsers();
 
-    }
 
-});
+            } catch (error) {
+
+                console.error(
+                    "Admin login error:",
+                    error
+                );
+
+
+                if (loginError) {
+
+                    loginError.textContent =
+                        error.message ||
+                        "Login failed.";
+
+                }
+
+
+            } finally {
+
+                if (loginButton) {
+                    loginButton.disabled = false;
+                }
+
+                if (loginText) {
+                    loginText.textContent = "Login";
+                }
+
+            }
+
+        }
+    );
+
+}
 
 
 // =====================================================
@@ -203,6 +339,11 @@ loginForm.addEventListener("submit", async function (event) {
 // =====================================================
 
 async function loadUsers() {
+
+    if (!usersTableBody) {
+        return;
+    }
+
 
     usersTableBody.innerHTML = `
         <tr>
@@ -237,14 +378,28 @@ async function loadUsers() {
                 : [];
 
 
-        totalUsers.textContent =
-            stats.total ?? users.length;
+        if (totalUsers) {
 
-        registeredUsers.textContent =
-            stats.registered ?? 0;
+            totalUsers.textContent =
+                stats.total ?? users.length;
 
-        availableUsers.textContent =
-            stats.available ?? 0;
+        }
+
+
+        if (registeredUsers) {
+
+            registeredUsers.textContent =
+                stats.registered ?? 0;
+
+        }
+
+
+        if (availableUsers) {
+
+            availableUsers.textContent =
+                stats.available ?? 0;
+
+        }
 
 
         if (users.length === 0) {
@@ -258,6 +413,7 @@ async function loadUsers() {
             `;
 
             return;
+
         }
 
 
@@ -348,46 +504,55 @@ async function loadUsers() {
 // LOGOUT
 // =====================================================
 
-logoutButton.addEventListener(
-    "click",
-    async function () {
+if (logoutButton) {
 
-        try {
+    logoutButton.addEventListener(
+        "click",
+        async function () {
 
-            await apiRequest(
-                "/api/admin/logout",
-                {
-                    method: "POST"
-                }
-            );
+            try {
 
-        } catch (error) {
+                await apiRequest(
+                    "/api/admin/logout",
+                    {
+                        method: "POST"
+                    }
+                );
 
-            console.error(
-                "Logout error:",
-                error
-            );
+            } catch (error) {
+
+                console.error(
+                    "Logout error:",
+                    error
+                );
+
+            }
+
+
+            showLogin();
 
         }
+    );
 
-        showLogin();
-
-    }
-);
+}
 
 
 // =====================================================
 // REFRESH
 // =====================================================
 
-refreshButton.addEventListener(
-    "click",
-    async function () {
+if (refreshButton) {
 
-        await loadUsers();
+    refreshButton.addEventListener(
+        "click",
+        async function () {
 
-    }
-);
+            await loadUsers();
+
+        }
+    );
+
+}
 
 
 // =====================================================
@@ -397,17 +562,37 @@ refreshButton.addEventListener(
 function escapeHtml(value) {
 
     return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+
+        .replace(
+            /</g,
+            "&lt;"
+        )
+
+        .replace(
+            />/g,
+            "&gt;"
+        )
+
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+
+        .replace(
+            /'/g,
+            "&#039;"
+        );
 
 }
 
 
 // =====================================================
-// CHECK EXISTING SESSION
+// CHECK ADMIN SESSION
 // =====================================================
 
 async function checkAdminSession() {
@@ -420,6 +605,12 @@ async function checkAdminSession() {
             );
 
 
+        console.log(
+            "Admin session:",
+            result
+        );
+
+
         if (
             result &&
             result.authenticated === true
@@ -427,7 +618,7 @@ async function checkAdminSession() {
 
             showDashboard();
 
-            loadUsers();
+            await loadUsers();
 
             return;
 
@@ -436,7 +627,14 @@ async function checkAdminSession() {
 
         showLogin();
 
+
     } catch (error) {
+
+        console.error(
+            "Admin session check error:",
+            error
+        );
+
 
         showLogin();
 
@@ -449,4 +647,11 @@ async function checkAdminSession() {
 // START
 // =====================================================
 
-checkAdminSession();
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        checkAdminSession();
+
+    }
+);
