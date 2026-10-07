@@ -6,18 +6,11 @@
 // API BASE URL
 // =====================================================
 
-// Your BACKEND (Render) URL - NOT the Netlify URL
-const REMOTE_API_URL = "https://tap-n-found-backend.onrender.com";
+// Same-origin: netlify.toml routes /api/* to the Netlify Function
+// (/.netlify/functions/api/:splat), so no full URL and no CORS needed.
+const API_URL = "";
 
-// true  = call /api/... on the same domain (Netlify forwards it to the
-//         backend using the _redirects file). No CORS needed.
-// false = call REMOTE_API_URL directly (backend must allow CORS).
-const USE_LOCAL_PROXY = true;
-
-const API_URL = USE_LOCAL_PROXY ? "" : REMOTE_API_URL;
-
-// Render free tier can take 30-60s to wake up
-const REQUEST_TIMEOUT_MS = 60000;
+const REQUEST_TIMEOUT_MS = 30000;
 
 
 // =====================================================
@@ -61,20 +54,11 @@ function setText(element, value) {
     }
 }
 
-function checkApiUrl() {
-    if (!USE_LOCAL_PROXY && (!API_URL || API_URL === "YOUR_BACKEND_URL")) {
-        throw new Error("Backend URL is not configured in admin.js.");
-    }
-}
-
-
 // =====================================================
 // API REQUEST
 // =====================================================
 
 async function apiRequest(url, options = {}) {
-
-    checkApiUrl();
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -114,15 +98,14 @@ async function apiRequest(url, options = {}) {
 
         if (error.name === "AbortError") {
             throw new Error(
-                "Server request timed out. The backend may be waking up or offline. Try again."
+                "Server request timed out. Please try again."
             );
         }
 
-        // fetch() throws TypeError for network failures AND CORS blocks
+        // fetch() throws TypeError for network failures
         if (error instanceof TypeError) {
             throw new Error(
-                "Cannot reach the server. Check your internet, that the backend is running, " +
-                "and that its CORS settings allow " + window.location.origin + "."
+                "Cannot reach the server. Check your internet connection and try again."
             );
         }
 
