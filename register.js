@@ -2,224 +2,211 @@
 // REGISTER OWNER + NFC
 // =====================================================
 
+const REGISTER_URL = "/api/nfc/register";
+const REQUEST_TIMEOUT_MS = 30000;
+
 const form = document.getElementById("registerForm");
 
 const submitButton = document.getElementById("submitButton");
 const submitText = document.getElementById("submitText");
 const successMessage = document.getElementById("successMessage");
 
-form.addEventListener("submit", async function (event) {
 
-    event.preventDefault();
+// =====================================================
+// HELPERS
+// =====================================================
 
-    // Disable button while registering
-    submitButton.disabled = true;
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
-    if (submitText) {
-        submitText.textContent = "Registering...";
-    }
+function resetButton() {
+    if (submitButton) submitButton.disabled = false;
+    if (submitText) submitText.textContent = "Register";
+}
 
-    if (successMessage) {
-        successMessage.textContent = "";
-        successMessage.style.display = "none";
-    }
+function failValidation(message) {
+    alert(message);
+    resetButton();
+}
 
-    // =====================================================
-    // GET FORM VALUES
-    // =====================================================
 
-    const nameElement = document.getElementById("name");
-    const emailElement = document.getElementById("email");
-    const passwordElement = document.getElementById("password");
-    const courseElement = document.getElementById("course");
-    const itemElement = document.getElementById("item");
+// =====================================================
+// SUBMIT HANDLER
+// =====================================================
 
-    // Check that all required elements exist
-    if (
-        !nameElement ||
-        !emailElement ||
-        !passwordElement ||
-        !courseElement ||
-        !itemElement
-    ) {
-        console.error("Registration form elements are missing.");
+if (!form) {
+    console.error("registerForm element not found.");
+} else {
 
-        alert(
-            "Registration form error. Please make sure the Gmail, password, name, course and item fields exist."
-        );
+    form.addEventListener("submit", async function (event) {
 
-        submitButton.disabled = false;
+        event.preventDefault();
 
-        if (submitText) {
-            submitText.textContent = "Register";
-        }
-
-        return;
-    }
-
-    // =====================================================
-    // READ VALUES
-    // =====================================================
-
-    const name = nameElement.value.trim();
-    const email = emailElement.value.trim().toLowerCase();
-    const password = passwordElement.value;
-    const course = courseElement.value.trim();
-    const item = itemElement.value.trim();
-
-    // =====================================================
-    // BASIC VALIDATION
-    // =====================================================
-
-    if (!name || !email || !password || !course || !item) {
-
-        alert("Please fill all fields.");
-
-        submitButton.disabled = false;
-
-        if (submitText) {
-            submitText.textContent = "Register";
-        }
-
-        return;
-    }
-
-    // =====================================================
-    // GMAIL VALIDATION
-    // =====================================================
-
-    if (!/^[^\s@]+@gmail\.com$/i.test(email)) {
-
-        alert("Please enter a valid Gmail address.");
-
-        submitButton.disabled = false;
-
-        if (submitText) {
-            submitText.textContent = "Register";
-        }
-
-        return;
-    }
-
-    // =====================================================
-    // PASSWORD VALIDATION
-    // =====================================================
-
-    if (password.length < 6) {
-
-        alert("Password must be at least 6 characters.");
-
-        submitButton.disabled = false;
-
-        if (submitText) {
-            submitText.textContent = "Register";
-        }
-
-        return;
-    }
-
-    // =====================================================
-    // SEND DATA TO SERVER
-    // =====================================================
-
-    try {
-
-        const response = await fetch("/api/nfc/register", {
-
-            method: "POST",
-
-            headers: {
-                "Content-Type": "application/json"
-            },
-
-            credentials: "include",
-
-            body: JSON.stringify({
-
-                name: name,
-
-                email: email,
-
-                password: password,
-
-                course: course,
-
-                item: item
-
-            })
-
-        });
-
-        const data = await response.json();
-
-        // =====================================================
-        // SERVER ERROR
-        // =====================================================
-
-        if (!response.ok) {
-
-            throw new Error(
-                data.message ||
-                "Registration failed."
-            );
-        }
-
-        // =====================================================
-        // SUCCESS
-        // =====================================================
-
-        console.log(
-            "Registration successful:",
-            data
-        );
+        // Disable button while registering
+        if (submitButton) submitButton.disabled = true;
+        if (submitText) submitText.textContent = "Registering...";
 
         if (successMessage) {
-
-            successMessage.style.display = "block";
-
-            successMessage.innerHTML =
-                "Registration successful!<br>" +
-                "Your NFC ID is: <strong>" +
-                data.nfcId +
-                "</strong>";
+            successMessage.textContent = "";
+            successMessage.style.display = "none";
         }
 
-        // Show NFC ID
-        alert(
-            "Registration successful!\n\n" +
-            "NFC ID: " +
-            data.nfcId
-        );
-
         // =====================================================
-        // REDIRECT TO LOGIN
+        // GET FORM ELEMENTS
         // =====================================================
 
-        setTimeout(function () {
+        const nameElement = document.getElementById("name");
+        const emailElement = document.getElementById("email");
+        const passwordElement = document.getElementById("password");
+        const courseElement = document.getElementById("course");
+        const itemElement = document.getElementById("item");
 
-            window.location.href = "/login.html";
-
-        }, 2000);
-
-    } catch (error) {
-
-        console.error(
-            "REGISTRATION ERROR:",
-            error
-        );
-
-        alert(
-            error.message ||
-            "Unable to register. Please try again."
-        );
-
-    } finally {
-
-        submitButton.disabled = false;
-
-        if (submitText) {
-            submitText.textContent = "Register";
+        if (
+            !nameElement ||
+            !emailElement ||
+            !passwordElement ||
+            !courseElement ||
+            !itemElement
+        ) {
+            console.error("Registration form elements are missing.");
+            failValidation(
+                "Registration form error. Please make sure the Gmail, password, name, course and item fields exist."
+            );
+            return;
         }
-    }
 
-});
+        // =====================================================
+        // READ VALUES
+        // =====================================================
+
+        const name = nameElement.value.trim();
+        const email = emailElement.value.trim().toLowerCase();
+        const password = passwordElement.value;
+        const course = courseElement.value.trim();
+        const item = itemElement.value.trim();
+
+        // =====================================================
+        // VALIDATION
+        // =====================================================
+
+        if (!name || !email || !password || !course || !item) {
+            failValidation("Please fill all fields.");
+            return;
+        }
+
+        if (!/^[^\s@]+@gmail\.com$/i.test(email)) {
+            failValidation("Please enter a valid Gmail address.");
+            return;
+        }
+
+        if (password.length < 6) {
+            failValidation("Password must be at least 6 characters.");
+            return;
+        }
+
+        // =====================================================
+        // SEND DATA TO SERVER
+        // =====================================================
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+        try {
+
+            const response = await fetch(REGISTER_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                credentials: "include",
+                signal: controller.signal,
+                body: JSON.stringify({ name, email, password, course, item })
+            });
+
+            // Read as text first so an HTML error page (404/502)
+            // doesn't crash with "Unexpected token '<'"
+            const text = await response.text();
+            let data = {};
+
+            try {
+                data = text ? JSON.parse(text) : {};
+            } catch {
+                console.error(
+                    `Non-JSON response (HTTP ${response.status}):`,
+                    text.slice(0, 200)
+                );
+                throw new Error(
+                    `Server error (HTTP ${response.status}). The registration service is not responding correctly.`
+                );
+            }
+
+            // =====================================================
+            // SERVER ERROR
+            // =====================================================
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                    data.error ||
+                    `Registration failed (HTTP ${response.status}).`
+                );
+            }
+
+            // =====================================================
+            // SUCCESS
+            // =====================================================
+
+            console.log("Registration successful:", data);
+
+            const nfcId = data.nfcId || "-";
+
+            if (successMessage) {
+                successMessage.style.display = "block";
+                successMessage.innerHTML =
+                    "Registration successful!<br>" +
+                    "Your NFC ID is: <strong>" +
+                    escapeHtml(nfcId) +
+                    "</strong>";
+            }
+
+            alert(
+                "Registration successful!\n\n" +
+                "NFC ID: " +
+                nfcId
+            );
+
+            // =====================================================
+            // REDIRECT TO LOGIN
+            // =====================================================
+
+            setTimeout(function () {
+                window.location.href = "/login.html";
+            }, 2000);
+
+        } catch (error) {
+
+            console.error("REGISTRATION ERROR:", error);
+
+            let message = error.message || "Unable to register. Please try again.";
+
+            if (error.name === "AbortError") {
+                message = "Server request timed out. Please try again.";
+            } else if (error instanceof TypeError) {
+                message = "Cannot reach the server. Check your internet connection and try again.";
+            }
+
+            alert(message);
+
+        } finally {
+
+            clearTimeout(timeout);
+            resetButton();
+        }
+    });
+}

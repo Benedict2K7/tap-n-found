@@ -8,14 +8,46 @@ const crypto = require("crypto");
 
 const app = express();
 
+// Behind Netlify / proxies: lets req.protocol and req.secure be correct
+app.set("trust proxy", 1);
+
+
+// =====================================================
+// NETLIFY PATH FIX
+// Netlify can pass the path as /.netlify/functions/api/...
+// Map it back to /api/... so the routes below match.
+// =====================================================
+
+app.use((req, res, next) => {
+    const prefix = "/.netlify/functions/api";
+
+    if (req.url.startsWith(prefix)) {
+        req.url = "/api" + req.url.slice(prefix.length);
+    }
+
+    next();
+});
+
 
 // =====================================================
 // MIDDLEWARE
 // =====================================================
 
+const ALLOWED_ORIGINS = [
+    "https://tap-n-found.netlify.app",
+    "http://localhost:5000",
+    "http://localhost:8888"
+];
+
 app.use(
     cors({
-        origin: "https://tap-n-found.netlify.app",
+        origin: (origin, callback) => {
+            // Same-origin requests and tools without an Origin header
+            if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+                return callback(null, true);
+            }
+            return callback(null, false);
+        },
         credentials: true
     })
 );
@@ -23,21 +55,16 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve frontend files
+// Serve frontend files (local development; Netlify serves these itself)
 app.use(express.static(__dirname));
 
 
 // =====================================================
-// OWNER SCHEMA
+// SCHEMAS
 // =====================================================
 
 const ownerSchema = new mongoose.Schema({
-    name: {
-        type: String,
-        required: true,
-        trim: true
-    },
-
+    name: { type: String, required: true, trim: true },
     email: {
         type: String,
         required: true,
@@ -46,263 +73,140 @@ const ownerSchema = new mongoose.Schema({
         trim: true,
         lowercase: true
     },
-
-    passwordHash: {
-        type: String,
-        required: true
-    },
-
-    course: {
-        type: String,
-        required: true,
-        trim: true
-    },
-
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
+    passwordHash: { type: String, required: true },
+    course: { type: String, required: true, trim: true },
+    createdAt: { type: Date, default: Date.now }
 });
 
-const Owner =
-    mongoose.models.Owner ||
-    mongoose.model("Owner", ownerSchema);
-
-
-// =====================================================
-// NFC SCHEMA
-// =====================================================
-
 const nfcSchema = new mongoose.Schema({
-    nfcId: {
-        type: String,
-        required: true,
-        unique: true,
-        index: true
-    },
-
+    nfcId: { type: String, required: true, unique: true, index: true },
     ownerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Owner",
         required: true,
         index: true
     },
+    name: { type: String, required: true, trim: true },
+    course: { type: String, required: true, trim: true },
+    item: { type: String, required: true, trim: true },
+    status: { type: String, default: "registered" },
 
-    name: {
-        type: String,
-        required: true,
-        trim: true
-    },
+    // Internal compatibility token. NOT stored inside the NFC tag.
+    ownerToken: { type: String, unique: true, sparse: true },
 
-    course: {
-        type: String,
-        required: true,
-        trim: true
-    },
-
-    item: {
-        type: String,
-        required: true,
-        trim: true
-    },
-
-    status: {
-        type: String,
-        default: "registered"
-    },
-
-    // Internal compatibility token.
-    // NOT stored inside NFC tag.
-    ownerToken: {
-        type: String,
-        unique: true,
-        sparse: true
-    },
-
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
+    createdAt: { type: Date, default: Date.now }
 });
-
-const NFC =
-    mongoose.models.NFC ||
-    mongoose.model("NFC", nfcSchema);
-
-
-// =====================================================
-// CHAT SCHEMA
-// =====================================================
 
 const chatSchema = new mongoose.Schema({
-    chatId: {
-        type: String,
-        required: true,
-        unique: true,
-        index: true
-    },
-
-    nfcId: {
-        type: String,
-        required: true,
-        index: true
-    },
-
-    finderToken: {
-        type: String,
-        required: true,
-        unique: true
-    },
-
-    createdAt: {
-        type: Date,
-        default: Date.now
-    },
-
-    expiresAt: {
-        type: Date,
-        required: true,
-        index: true
-    },
-
-    status: {
-        type: String,
-        default: "active"
-    }
+    chatId: { type: String, required: true, unique: true, index: true },
+    nfcId: { type: String, required: true, index: true },
+    finderToken: { type: String, required: true, unique: true },
+    createdAt: { type: Date, default: Date.now },
+    expiresAt: { type: Date, required: true, index: true },
+    status: { type: String, default: "active" }
 });
-
-const Chat =
-    mongoose.models.Chat ||
-    mongoose.model("Chat", chatSchema);
-
-
-// =====================================================
-// MESSAGE SCHEMA
-// =====================================================
 
 const messageSchema = new mongoose.Schema({
-    chatId: {
-        type: String,
-        required: true,
-        index: true
-    },
-
-    sender: {
-        type: String,
-        enum: ["finder", "owner"],
-        required: true
-    },
-
-    message: {
-        type: String,
-        required: true,
-        maxlength: 500,
-        trim: true
-    },
-
-    sentAt: {
-        type: Date,
-        default: Date.now
-    }
+    chatId: { type: String, required: true, index: true },
+    sender: { type: String, enum: ["finder", "owner"], required: true },
+    message: { type: String, required: true, maxlength: 500, trim: true },
+    sentAt: { type: Date, default: Date.now }
 });
 
+const Owner = mongoose.models.Owner || mongoose.model("Owner", ownerSchema);
+const NFC = mongoose.models.NFC || mongoose.model("NFC", nfcSchema);
+const Chat = mongoose.models.Chat || mongoose.model("Chat", chatSchema);
 const Message =
-    mongoose.models.Message ||
-    mongoose.model("Message", messageSchema);
+    mongoose.models.Message || mongoose.model("Message", messageSchema);
 
 
 // =====================================================
-// MONGODB CONNECTION
+// MONGODB CONNECTION (cached, safe for serverless)
 // =====================================================
 
-async function connectMongoDB() {
-    try {
-        if (!process.env.MONGODB_URI) {
-            throw new Error(
-                "MONGODB_URI is missing in .env file"
-            );
-        }
+let mongoPromise = null;
 
-        await mongoose.connect(
-            process.env.MONGODB_URI,
-            {
+function connectMongoDB() {
+    if (mongoose.connection.readyState === 1) {
+        return Promise.resolve(true);
+    }
+
+    if (mongoPromise) {
+        return mongoPromise;
+    }
+
+    mongoPromise = (async () => {
+        try {
+            if (!process.env.MONGODB_URI) {
+                throw new Error("MONGODB_URI is missing");
+            }
+
+            await mongoose.connect(process.env.MONGODB_URI, {
                 serverSelectionTimeoutMS: 10000,
                 connectTimeoutMS: 10000,
                 socketTimeoutMS: 10000,
                 maxIdleTimeMS: 60000
-            }
-        );
+            });
 
-        console.log("=====================================");
-        console.log("MongoDB connected successfully");
-        console.log(
-            "Database:",
-            mongoose.connection.name
-        );
-        console.log("=====================================");
+            console.log("MongoDB connected:", mongoose.connection.name);
 
-        // Remove old phone indexes if they still exist
-        try {
-            const indexes =
-                await Owner.collection.indexes();
+            // Remove old phone indexes if they still exist
+            try {
+                const indexes = await Owner.collection.indexes();
 
-            for (const index of indexes) {
-                if (
-                    index.name !== "_id_" &&
-                    index.key &&
-                    Object.prototype.hasOwnProperty.call(
-                        index.key,
-                        "phone"
-                    )
-                ) {
-                    await Owner.collection.dropIndex(
-                        index.name
-                    );
-
-                    console.log(
-                        "Removed old phone index:",
-                        index.name
-                    );
+                for (const index of indexes) {
+                    if (
+                        index.name !== "_id_" &&
+                        index.key &&
+                        Object.prototype.hasOwnProperty.call(index.key, "phone")
+                    ) {
+                        await Owner.collection.dropIndex(index.name);
+                        console.log("Removed old phone index:", index.name);
+                    }
                 }
+            } catch (indexError) {
+                console.log(
+                    "Old phone index cleanup skipped:",
+                    indexError.message
+                );
             }
-        } catch (indexError) {
-            console.log(
-                "Old phone index cleanup skipped:",
-                indexError.message
-            );
+
+            return true;
+
+        } catch (error) {
+            console.error("MongoDB connection failed:", error.message);
+            mongoPromise = null; // allow a retry on the next request
+            return false;
         }
+    })();
 
-    } catch (error) {
-        console.error(
-            "MongoDB connection failed:"
-        );
-
-        console.error(
-            error.message
-        );
-    }
+    return mongoPromise;
 }
+
+// Make sure the database is connected before any API route runs
+app.use("/api", async (req, res, next) => {
+    const connected = await connectMongoDB();
+
+    if (!connected && req.path !== "/health") {
+        return res.status(503).json({
+            message: "Database is not available. Please try again shortly."
+        });
+    }
+
+    next();
+});
 
 
 // =====================================================
-// TOKEN HELPERS
+// HELPERS
 // =====================================================
 
 function generateToken(bytes = 32) {
-    return crypto
-        .randomBytes(bytes)
-        .toString("hex");
+    return crypto.randomBytes(bytes).toString("hex");
 }
 
-
-// =====================================================
-// PUBLIC NFC DATA
-// =====================================================
-
 function getPublicNFC(nfc) {
-    if (!nfc) {
-        return null;
-    }
+    if (!nfc) return null;
 
     return {
         nfcId: nfc.nfcId,
@@ -314,20 +218,28 @@ function getPublicNFC(nfc) {
     };
 }
 
-
-// =====================================================
-// CHAT EXPIRATION
-// =====================================================
+function getPublicOwner(owner) {
+    return {
+        name: owner.name,
+        email: owner.email,
+        course: owner.course
+    };
+}
 
 function chatIsExpired(chat) {
-    if (!chat) {
-        return true;
-    }
+    if (!chat) return true;
+    return new Date() > new Date(chat.expiresAt);
+}
 
-    return (
-        new Date() >
-        new Date(chat.expiresAt)
-    );
+function secureCompare(a, b) {
+    if (!a || !b) return false;
+
+    const bufferA = Buffer.from(String(a));
+    const bufferB = Buffer.from(String(b));
+
+    if (bufferA.length !== bufferB.length) return false;
+
+    return crypto.timingSafeEqual(bufferA, bufferB);
 }
 
 
@@ -336,120 +248,40 @@ function chatIsExpired(chat) {
 // =====================================================
 
 function hashPassword(password) {
-    return new Promise(
-        (resolve, reject) => {
-            const salt =
-                crypto
-                    .randomBytes(16)
-                    .toString("hex");
+    return new Promise((resolve, reject) => {
+        const salt = crypto.randomBytes(16).toString("hex");
 
-            crypto.scrypt(
-                password,
-                salt,
-                64,
-                (error, derivedKey) => {
-                    if (error) {
-                        reject(error);
-                        return;
-                    }
-
-                    resolve(
-                        `${salt}:${derivedKey.toString(
-                            "hex"
-                        )}`
-                    );
-                }
-            );
-        }
-    );
+        crypto.scrypt(password, salt, 64, (error, derivedKey) => {
+            if (error) return reject(error);
+            resolve(`${salt}:${derivedKey.toString("hex")}`);
+        });
+    });
 }
 
+function verifyPassword(password, storedHash) {
+    return new Promise((resolve, reject) => {
+        try {
+            const parts = String(storedHash || "").split(":");
 
-function verifyPassword(
-    password,
-    storedHash
-) {
-    return new Promise(
-        (resolve, reject) => {
-            try {
-                const parts =
-                    storedHash.split(":");
+            if (parts.length !== 2) return resolve(false);
 
-                if (parts.length !== 2) {
-                    resolve(false);
-                    return;
+            const salt = parts[0];
+            const storedKey = Buffer.from(parts[1], "hex");
+
+            crypto.scrypt(password, salt, 64, (error, derivedKey) => {
+                if (error) return reject(error);
+
+                if (storedKey.length !== derivedKey.length) {
+                    return resolve(false);
                 }
 
-                const salt =
-                    parts[0];
+                resolve(crypto.timingSafeEqual(storedKey, derivedKey));
+            });
 
-                const storedKey =
-                    Buffer.from(
-                        parts[1],
-                        "hex"
-                    );
-
-                crypto.scrypt(
-                    password,
-                    salt,
-                    64,
-                    (error, derivedKey) => {
-                        if (error) {
-                            reject(error);
-                            return;
-                        }
-
-                        if (
-                            storedKey.length !==
-                            derivedKey.length
-                        ) {
-                            resolve(false);
-                            return;
-                        }
-
-                        resolve(
-                            crypto.timingSafeEqual(
-                                storedKey,
-                                derivedKey
-                            )
-                        );
-                    }
-                );
-
-            } catch (error) {
-                reject(error);
-            }
+        } catch (error) {
+            reject(error);
         }
-    );
-}
-
-
-// =====================================================
-// SECURE COMPARE
-// =====================================================
-
-function secureCompare(a, b) {
-    if (!a || !b) {
-        return false;
-    }
-
-    const bufferA =
-        Buffer.from(String(a));
-
-    const bufferB =
-        Buffer.from(String(b));
-
-    if (
-        bufferA.length !==
-        bufferB.length
-    ) {
-        return false;
-    }
-
-    return crypto.timingSafeEqual(
-        bufferA,
-        bufferB
-    );
+    });
 }
 
 
@@ -459,172 +291,154 @@ function secureCompare(a, b) {
 
 function parseCookies(req) {
     const cookies = {};
+    const cookieHeader = req.headers.cookie;
 
-    const cookieHeader =
-        req.headers.cookie;
+    if (!cookieHeader) return cookies;
 
-    if (!cookieHeader) {
-        return cookies;
-    }
+    cookieHeader.split(";").forEach(cookie => {
+        const parts = cookie.trim().split("=");
+        const key = parts.shift();
 
-    cookieHeader
-        .split(";")
-        .forEach(cookie => {
-            const parts =
-                cookie.trim().split("=");
+        if (!key) return;
 
-            const key =
-                parts.shift();
-
-            if (!key) {
-                return;
-            }
-
-            cookies[key] =
-                decodeURIComponent(
-                    parts.join("=")
-                );
-        });
+        try {
+            cookies[key] = decodeURIComponent(parts.join("="));
+        } catch {
+            cookies[key] = parts.join("=");
+        }
+    });
 
     return cookies;
 }
 
+function setSessionCookie(req, res, name, value, maxAgeSeconds) {
+    const secure =
+        req.secure || req.headers["x-forwarded-proto"] === "https";
 
-// =====================================================
-// OWNER SESSION
-// =====================================================
-
-const OWNER_COOKIE_NAME =
-    "tnf_owner_session";
-
-
-function createOwnerToken(ownerId) {
-    const secret =
-        process.env.OWNER_SECRET ||
-        process.env.ADMIN_SECRET ||
-        "tnf-development-secret";
-
-    const expiresAt =
-        Date.now() +
-        7 * 24 * 60 * 60 * 1000;
-
-    const payload =
-        `${ownerId}.${expiresAt}`;
-
-    const signature =
-        crypto
-            .createHmac(
-                "sha256",
-                secret
-            )
-            .update(payload)
-            .digest("hex");
-
-    return `${payload}.${signature}`;
+    res.setHeader(
+        "Set-Cookie",
+        `${name}=${encodeURIComponent(value)}; HttpOnly; Path=/; ` +
+        `Max-Age=${maxAgeSeconds}; SameSite=Lax${secure ? "; Secure" : ""}`
+    );
 }
 
+function clearSessionCookie(req, res, name) {
+    setSessionCookie(req, res, name, "", 0);
+}
+
+
+// =====================================================
+// SESSION TOKENS (HMAC signed)
+// =====================================================
+
+function signPayload(payload, secret) {
+    return crypto.createHmac("sha256", secret).update(payload).digest("hex");
+}
+
+
+// ---------- Owner ----------
+
+const OWNER_COOKIE_NAME = "tnf_owner_session";
+const OWNER_SESSION_SECONDS = 7 * 24 * 60 * 60;
+
+function ownerSecret() {
+    return (
+        process.env.OWNER_SECRET ||
+        process.env.ADMIN_SECRET ||
+        "tnf-development-secret"
+    );
+}
+
+function createOwnerToken(ownerId) {
+    const expiresAt = Date.now() + OWNER_SESSION_SECONDS * 1000;
+    const payload = `${ownerId}.${expiresAt}`;
+
+    return `${payload}.${signPayload(payload, ownerSecret())}`;
+}
 
 function verifyOwnerToken(token) {
     try {
-        if (!token) {
-            return null;
-        }
+        if (!token) return null;
 
-        const parts =
-            token.split(".");
+        const parts = token.split(".");
+        if (parts.length !== 3) return null;
 
-        if (parts.length !== 3) {
-            return null;
-        }
+        const ownerId = parts[0];
+        const expiresAt = Number(parts[1]);
+        const signature = parts[2];
 
-        const ownerId =
-            parts[0];
+        if (!ownerId || !expiresAt || !signature) return null;
+        if (Date.now() > expiresAt) return null;
 
-        const expiresAt =
-            Number(parts[1]);
+        const expected = signPayload(`${ownerId}.${expiresAt}`, ownerSecret());
 
-        const signature =
-            parts[2];
+        if (!secureCompare(signature, expected)) return null;
 
-        if (
-            !ownerId ||
-            !expiresAt ||
-            !signature
-        ) {
-            return null;
-        }
+        return { ownerId, expiresAt };
 
-        if (
-            Date.now() >
-            expiresAt
-        ) {
-            return null;
-        }
+    } catch {
+        return null;
+    }
+}
 
-        const secret =
-            process.env.OWNER_SECRET ||
-            process.env.ADMIN_SECRET ||
-            "tnf-development-secret";
+async function getLoggedInOwner(req) {
+    try {
+        const cookies = parseCookies(req);
+        const verified = verifyOwnerToken(cookies[OWNER_COOKIE_NAME]);
 
-        const payload =
-            `${ownerId}.${expiresAt}`;
+        if (!verified) return null;
 
-        const expectedSignature =
-            crypto
-                .createHmac(
-                    "sha256",
-                    secret
-                )
-                .update(payload)
-                .digest("hex");
+        const owner = await Owner.findById(verified.ownerId);
 
-        if (
-            !secureCompare(
-                signature,
-                expectedSignature
-            )
-        ) {
-            return null;
-        }
+        return owner || null;
 
-        return {
-            ownerId,
-            expiresAt
-        };
-
-    } catch (error) {
+    } catch {
         return null;
     }
 }
 
 
-async function getLoggedInOwner(req) {
+// ---------- Admin ----------
+
+const ADMIN_COOKIE_NAME = "tnf_admin_session";
+const ADMIN_SESSION_SECONDS = 24 * 60 * 60;
+
+function adminSecret() {
+    return process.env.ADMIN_SECRET || "tnf-admin-development-secret";
+}
+
+function createAdminToken() {
+    const expiresAt = Date.now() + ADMIN_SESSION_SECONDS * 1000;
+    const payload = `admin.${expiresAt}`;
+
+    return `${payload}.${signPayload(payload, adminSecret())}`;
+}
+
+function verifyAdminToken(token) {
     try {
-        const cookies =
-            parseCookies(req);
+        if (!token) return false;
 
-        const token =
-            cookies[
-                OWNER_COOKIE_NAME
-            ];
+        const parts = token.split(".");
+        if (parts.length !== 3) return false;
 
-        const verified =
-            verifyOwnerToken(token);
+        const expiresAt = Number(parts[1]);
+        const signature = parts[2];
 
-        if (!verified) {
-            return null;
-        }
+        if (!expiresAt || !signature) return false;
+        if (Date.now() > expiresAt) return false;
 
-        const owner =
-            await Owner.findById(
-                verified.ownerId
-            );
+        const expected = signPayload(`admin.${expiresAt}`, adminSecret());
 
-        return owner || null;
+        return secureCompare(signature, expected);
 
-    } catch (error) {
-        return null;
+    } catch {
+        return false;
     }
+}
+
+function adminAuthenticated(req) {
+    const cookies = parseCookies(req);
+    return verifyAdminToken(cookies[ADMIN_COOKIE_NAME]);
 }
 
 
@@ -632,611 +446,266 @@ async function getLoggedInOwner(req) {
 // HEALTH
 // =====================================================
 
-app.get(
-    "/api/health",
-    async (req, res) => {
-        try {
-            const mongoState =
-                mongoose.connection.readyState;
-
-            res.json({
-                ok: true,
-                message:
-                    "TNF server is running",
-                mongo:
-                    mongoState === 1
-                        ? "connected"
-                        : "disconnected"
-            });
-
-        } catch (error) {
-            res.status(500).json({
-                ok: false,
-                message:
-                    error.message
-            });
-        }
-    }
-);
+app.get("/api/health", (req, res) => {
+    res.json({
+        ok: true,
+        message: "TNF server is running",
+        mongo:
+            mongoose.connection.readyState === 1
+                ? "connected"
+                : "disconnected"
+    });
+});
 
 
 // =====================================================
 // OWNER + NFC REGISTRATION
 // =====================================================
 
-app.post(
-    "/api/nfc/register",
-    async (req, res) => {
-        try {
+app.post("/api/nfc/register", async (req, res) => {
+    try {
 
-            const {
-                name,
-                email,
-                password,
-                course,
-                item
-            } = req.body;
+        const { name, email, password, course, item } = req.body || {};
 
-            if (
-                !name ||
-                !email ||
-                !password ||
-                !course ||
-                !item
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Name, Gmail address, password, course and item are required."
-                });
-            }
-
-            const cleanName =
-                String(name).trim();
-
-            const cleanEmail =
-                String(email)
-                    .trim()
-                    .toLowerCase();
-
-            const cleanCourse =
-                String(course).trim();
-
-            const cleanItem =
-                String(item).trim();
-
-            // Gmail validation
-            if (
-                !/^[^\s@]+@gmail\.com$/i.test(
-                    cleanEmail
-                )
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Please enter a valid Gmail address ending with @gmail.com."
-                });
-            }
-
-            if (
-                String(password).length < 6
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Password must be at least 6 characters long."
-                });
-            }
-
-            const existingOwner =
-                await Owner.findOne({
-                    email: cleanEmail
-                });
-
-            if (existingOwner) {
-                return res.status(409).json({
-                    message:
-                        "This Gmail address is already registered."
-                });
-            }
-
-            const passwordHash =
-                await hashPassword(
-                    String(password)
-                );
-
-            const owner =
-                new Owner({
-                    name: cleanName,
-                    email: cleanEmail,
-                    passwordHash,
-                    course: cleanCourse
-                });
-
-            await owner.save();
-
-            // Generate NFC ID
-            const nfcId =
-                "TNF-" +
-                Date.now()
-                    .toString(36)
-                    .toUpperCase();
-
-            const ownerToken =
-                generateToken(32);
-
-            const nfc =
-                new NFC({
-                    nfcId,
-                    ownerId: owner._id,
-                    name: cleanName,
-                    course: cleanCourse,
-                    item: cleanItem,
-                    status: "registered",
-                    ownerToken
-                });
-
-            await nfc.save();
-
-            // Automatically login owner
-            const ownerSession =
-                createOwnerToken(
-                    owner._id.toString()
-                );
-
-            res.setHeader(
-                "Set-Cookie",
-                `${OWNER_COOKIE_NAME}=${encodeURIComponent(
-                    ownerSession
-                )}; HttpOnly; Path=/; Max-Age=${
-                    7 * 24 * 60 * 60
-                }; SameSite=Lax`
-            );
-
-            const baseUrl =
-                `${req.protocol}://${req.get("host")}`;
-
-            const nfcUrl =
-                `${baseUrl}/nfc/${encodeURIComponent(
-                    nfcId
-                )}`;
-
-            const ownerAccessUrl =
-                `${baseUrl}/owner.html?nfcId=${encodeURIComponent(
-                    nfcId
-                )}`;
-
-            console.log(
-                "====================================="
-            );
-
-            console.log(
-                "New owner registered"
-            );
-
-            console.log(
-                "Name:",
-                cleanName
-            );
-
-            console.log(
-                "Gmail:",
-                cleanEmail
-            );
-
-            console.log(
-                "NFC ID:",
-                nfcId
-            );
-
-            console.log(
-                "NFC URL:",
-                nfcUrl
-            );
-
-            console.log(
-                "=====================================");
-
-            return res.status(201).json({
+        if (!name || !email || !password || !course || !item) {
+            return res.status(400).json({
                 message:
-                    "NFC registered successfully!",
-
-                nfcId,
-
-                nfcUrl,
-
-                ownerAccessUrl,
-
-                owner: {
-                    name: owner.name,
-                    email: owner.email,
-                    course: owner.course
-                }
-            });
-
-        } catch (error) {
-
-            console.error(
-                "NFC registration error:",
-                error
-            );
-
-            if (
-                error.code === 11000
-            ) {
-                return res.status(409).json({
-                    message:
-                        "This Gmail address or NFC ID is already registered."
-                });
-            }
-
-            return res.status(500).json({
-                message:
-                    "Server error while registering NFC.",
-                error:
-                    error.message
+                    "Name, Gmail address, password, course and item are required."
             });
         }
+
+        const cleanName = String(name).trim();
+        const cleanEmail = String(email).trim().toLowerCase();
+        const cleanCourse = String(course).trim();
+        const cleanItem = String(item).trim();
+
+        if (!/^[^\s@]+@gmail\.com$/i.test(cleanEmail)) {
+            return res.status(400).json({
+                message:
+                    "Please enter a valid Gmail address ending with @gmail.com."
+            });
+        }
+
+        if (String(password).length < 6) {
+            return res.status(400).json({
+                message: "Password must be at least 6 characters long."
+            });
+        }
+
+        const existingOwner = await Owner.findOne({ email: cleanEmail });
+
+        if (existingOwner) {
+            return res.status(409).json({
+                message: "This Gmail address is already registered."
+            });
+        }
+
+        const passwordHash = await hashPassword(String(password));
+
+        const owner = new Owner({
+            name: cleanName,
+            email: cleanEmail,
+            passwordHash,
+            course: cleanCourse
+        });
+
+        await owner.save();
+
+        // Generate NFC ID
+        const nfcId = "TNF-" + Date.now().toString(36).toUpperCase();
+
+        const nfc = new NFC({
+            nfcId,
+            ownerId: owner._id,
+            name: cleanName,
+            course: cleanCourse,
+            item: cleanItem,
+            status: "registered",
+            ownerToken: generateToken(32)
+        });
+
+        await nfc.save();
+
+        // Automatically log the owner in
+        setSessionCookie(
+            req,
+            res,
+            OWNER_COOKIE_NAME,
+            createOwnerToken(owner._id.toString()),
+            OWNER_SESSION_SECONDS
+        );
+
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        const nfcUrl = `${baseUrl}/nfc/${encodeURIComponent(nfcId)}`;
+        const ownerAccessUrl =
+            `${baseUrl}/owner.html?nfcId=${encodeURIComponent(nfcId)}`;
+
+        console.log("New owner registered:", cleanEmail, nfcId);
+
+        return res.status(201).json({
+            message: "NFC registered successfully!",
+            nfcId,
+            nfcUrl,
+            ownerAccessUrl,
+            owner: getPublicOwner(owner)
+        });
+
+    } catch (error) {
+
+        console.error("NFC registration error:", error);
+
+        if (error.code === 11000) {
+            return res.status(409).json({
+                message: "This Gmail address or NFC ID is already registered."
+            });
+        }
+
+        return res.status(500).json({
+            message: "Server error while registering NFC.",
+            error: error.message
+        });
     }
-);
+});
 
 
 // =====================================================
 // GET ALL NFCs
 // =====================================================
 
-app.get(
-    "/api/nfc/all",
-    async (req, res) => {
-        try {
+app.get("/api/nfc/all", async (req, res) => {
+    try {
+        const nfcList = await NFC.find().sort({ createdAt: -1 });
 
-            const nfcList =
-                await NFC.find()
-                    .sort({
-                        createdAt: -1
-                    });
+        res.json(nfcList.map(getPublicNFC));
 
-            res.json(
-                nfcList.map(
-                    getPublicNFC
-                )
-            );
+    } catch (error) {
+        console.error("Get all NFC error:", error);
 
-        } catch (error) {
-
-            console.error(
-                "Get all NFC error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Failed to fetch NFC records."
-            });
-        }
+        res.status(500).json({
+            message: "Failed to fetch NFC records."
+        });
     }
-);
+});
 
 
 // =====================================================
 // GET ONE NFC
 // =====================================================
 
-app.get(
-    "/api/nfc/:nfcId",
-    async (req, res) => {
-        try {
+app.get("/api/nfc/:nfcId", async (req, res) => {
+    try {
+        const nfc = await NFC.findOne({ nfcId: req.params.nfcId });
 
-            const nfc =
-                await NFC.findOne({
-                    nfcId:
-                        req.params.nfcId
-                });
-
-            if (!nfc) {
-                return res.status(404).json({
-                    message:
-                        "NFC not found."
-                });
-            }
-
-            res.json(
-                getPublicNFC(nfc)
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Get NFC error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Failed to fetch NFC."
-            });
+        if (!nfc) {
+            return res.status(404).json({ message: "NFC not found." });
         }
+
+        res.json(getPublicNFC(nfc));
+
+    } catch (error) {
+        console.error("Get NFC error:", error);
+
+        res.status(500).json({ message: "Failed to fetch NFC." });
     }
-);
+});
 
 
 // =====================================================
 // IDENTIFY OWNER OR FINDER
 // =====================================================
 
-app.get(
-    "/api/nfc/:nfcId/identify",
-    async (req, res) => {
-        try {
-
-            const nfc =
-                await NFC.findOne({
-                    nfcId:
-                        req.params.nfcId
-                });
-
-            if (!nfc) {
-                return res.status(404).json({
-                    message:
-                        "NFC not found."
-                });
-            }
-
-            const owner =
-                await getLoggedInOwner(req);
-
-            // Owner
-            if (
-                owner &&
-                owner._id.toString() ===
-                    nfc.ownerId.toString()
-            ) {
-
-                return res.json({
-                    role: "owner",
-
-                    nfc:
-                        getPublicNFC(nfc),
-
-                    owner: {
-                        name:
-                            owner.name,
-
-                        email:
-                            owner.email,
-
-                        course:
-                            owner.course
-                    }
-                });
-            }
-
-            // Finder
-            return res.json({
-                role: "finder",
-
-                nfc:
-                    getPublicNFC(nfc)
-            });
-
-        } catch (error) {
-
-            console.error(
-                "NFC identification error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Unable to identify NFC user."
-            });
-        }
-    }
-);
-
-
-// =====================================================
-// ADMIN AUTHENTICATION
-// =====================================================
-
-const ADMIN_COOKIE_NAME =
-    "tnf_admin_session";
-
-
-function createAdminToken() {
-
-    const secret =
-        process.env.ADMIN_SECRET ||
-        "tnf-admin-development-secret";
-
-    const expiresAt =
-        Date.now() +
-        24 * 60 * 60 * 1000;
-
-    const payload =
-        `admin.${expiresAt}`;
-
-    const signature =
-        crypto
-            .createHmac(
-                "sha256",
-                secret
-            )
-            .update(payload)
-            .digest("hex");
-
-    return `${payload}.${signature}`;
-}
-
-
-function verifyAdminToken(token) {
+app.get("/api/nfc/:nfcId/identify", async (req, res) => {
     try {
+        const nfc = await NFC.findOne({ nfcId: req.params.nfcId });
 
-        if (!token) {
-            return false;
+        if (!nfc) {
+            return res.status(404).json({ message: "NFC not found." });
         }
 
-        const parts =
-            token.split(".");
+        const owner = await getLoggedInOwner(req);
 
-        if (parts.length !== 3) {
-            return false;
+        if (owner && owner._id.toString() === nfc.ownerId.toString()) {
+            return res.json({
+                role: "owner",
+                nfc: getPublicNFC(nfc),
+                owner: getPublicOwner(owner)
+            });
         }
 
-        const expiresAt =
-            Number(parts[1]);
-
-        const signature =
-            parts[2];
-
-        if (
-            !expiresAt ||
-            !signature
-        ) {
-            return false;
-        }
-
-        if (
-            Date.now() >
-            expiresAt
-        ) {
-            return false;
-        }
-
-        const secret =
-            process.env.ADMIN_SECRET ||
-            "tnf-admin-development-secret";
-
-        const payload =
-            `admin.${expiresAt}`;
-
-        const expectedSignature =
-            crypto
-                .createHmac(
-                    "sha256",
-                    secret
-                )
-                .update(payload)
-                .digest("hex");
-
-        return secureCompare(
-            signature,
-            expectedSignature
-        );
+        return res.json({
+            role: "finder",
+            nfc: getPublicNFC(nfc)
+        });
 
     } catch (error) {
-        return false;
+        console.error("NFC identification error:", error);
+
+        res.status(500).json({ message: "Unable to identify NFC user." });
     }
-}
-
-
-function adminAuthenticated(req) {
-
-    const cookies =
-        parseCookies(req);
-
-    return verifyAdminToken(
-        cookies[
-            ADMIN_COOKIE_NAME
-        ]
-    );
-}
+});
 
 
 // =====================================================
-// ADMIN LOGIN
+// ADMIN LOGIN / LOGOUT / ME
 // =====================================================
 
-app.post(
-    "/api/admin/login",
-    async (req, res) => {
+app.post("/api/admin/login", (req, res) => {
+    try {
+        const { username, password } = req.body || {};
 
-        try {
-
-            const {
-                username,
-                password
-            } = req.body;
-
-            if (
-                !username ||
-                !password
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Username and password are required."
-                });
-            }
-
-            const validUsername =
-                username ===
-                process.env.ADMIN_USERNAME;
-
-            const validPassword =
-                password ===
-                process.env.ADMIN_PASSWORD;
-
-            if (
-                !validUsername ||
-                !validPassword
-            ) {
-                return res.status(401).json({
-                    message:
-                        "Invalid admin username or password."
-                });
-            }
-
-            const token =
-                createAdminToken();
-
-            res.setHeader(
-                "Set-Cookie",
-                `${ADMIN_COOKIE_NAME}=${encodeURIComponent(
-                    token
-                )}; HttpOnly; Path=/; Max-Age=${
-                    24 * 60 * 60
-                }; SameSite=Lax`
-            );
-
-            res.json({
-                message:
-                    "Admin login successful."
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Admin login error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Admin login failed."
+        if (!username || !password) {
+            return res.status(400).json({
+                message: "Username and password are required."
             });
         }
-    }
-);
 
+        const validUsername = secureCompare(
+            username,
+            process.env.ADMIN_USERNAME
+        );
 
-// =====================================================
-// ADMIN ME
-// =====================================================
+        const validPassword = secureCompare(
+            password,
+            process.env.ADMIN_PASSWORD
+        );
 
-app.get(
-    "/api/admin/me",
-    (req, res) => {
-
-        if (
-            !adminAuthenticated(req)
-        ) {
+        if (!validUsername || !validPassword) {
             return res.status(401).json({
-                authenticated: false
+                message: "Invalid admin username or password."
             });
         }
 
-        res.json({
-            authenticated: true
-        });
+        setSessionCookie(
+            req,
+            res,
+            ADMIN_COOKIE_NAME,
+            createAdminToken(),
+            ADMIN_SESSION_SECONDS
+        );
+
+        res.json({ message: "Admin login successful." });
+
+    } catch (error) {
+        console.error("Admin login error:", error);
+
+        res.status(500).json({ message: "Admin login failed." });
     }
-);
+});
+
+app.post("/api/admin/logout", (req, res) => {
+    clearSessionCookie(req, res, ADMIN_COOKIE_NAME);
+
+    res.json({ message: "Admin logged out." });
+});
+
+app.get("/api/admin/me", (req, res) => {
+    if (!adminAuthenticated(req)) {
+        return res.status(401).json({ authenticated: false });
+    }
+
+    res.json({ authenticated: true });
+});
+
 
 // =====================================================
 // ADMIN USERS + NFC REGISTRATIONS
@@ -1251,544 +720,258 @@ app.get("/api/admin/users", async (req, res) => {
             });
         }
 
-        // Get all owners
         const owners = await Owner.find()
             .select("_id name email course createdAt")
             .sort({ createdAt: -1 });
 
-        // Get all NFC registrations
         const nfcList = await NFC.find()
-            .select(
-                "nfcId ownerId name course item status createdAt"
-            )
+            .select("nfcId ownerId name course item status createdAt")
             .sort({ createdAt: -1 });
 
-        // Statistics
-        const total = nfcList.length;
+        const countStatus = status =>
+            nfcList.filter(
+                nfc => String(nfc.status).toLowerCase() === status
+            ).length;
 
-        const registered = nfcList.filter(
-            nfc =>
-                String(nfc.status).toLowerCase() ===
-                "registered"
-        ).length;
-
-        const available = nfcList.filter(
-            nfc =>
-                String(nfc.status).toLowerCase() ===
-                "available"
-        ).length;
-
-        // Send everything to Admin dashboard
         res.json({
             stats: {
-                total: total,
-                registered: registered,
-                available: available
+                total: nfcList.length,
+                registered: countStatus("registered"),
+                available: countStatus("available")
             },
-
             users: nfcList,
-
-            owners: owners
+            owners
         });
 
     } catch (error) {
-
-        console.error(
-            "Admin users error:",
-            error
-        );
+        console.error("Admin users error:", error);
 
         res.status(500).json({
             message: "Failed to fetch users.",
             error: error.message
         });
-
     }
 });
 
+
 // =====================================================
-// OWNER LOGIN USING GMAIL
+// OWNER LOGIN / ME / LOGOUT
 // =====================================================
 
-app.post(
-    "/api/owner/login",
-    async (req, res) => {
+app.post("/api/owner/login", async (req, res) => {
+    try {
+        const { email, password } = req.body || {};
 
-        try {
-
-            const {
-                email,
-                password
-            } = req.body;
-
-            if (
-                !email ||
-                !password
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Gmail address and password are required."
-                });
-            }
-
-            const cleanEmail =
-                String(email)
-                    .trim()
-                    .toLowerCase();
-
-            if (
-                !/^[^\s@]+@gmail\.com$/i.test(
-                    cleanEmail
-                )
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Please enter a valid Gmail address."
-                });
-            }
-
-            const owner =
-                await Owner.findOne({
-                    email: cleanEmail
-                });
-
-            if (!owner) {
-                return res.status(401).json({
-                    message:
-                        "Invalid Gmail address or password."
-                });
-            }
-
-            const passwordCorrect =
-                await verifyPassword(
-                    String(password),
-                    owner.passwordHash
-                );
-
-            if (!passwordCorrect) {
-                return res.status(401).json({
-                    message:
-                        "Invalid Gmail address or password."
-                });
-            }
-
-            const sessionToken =
-                createOwnerToken(
-                    owner._id.toString()
-                );
-
-            res.setHeader(
-                "Set-Cookie",
-                `${OWNER_COOKIE_NAME}=${encodeURIComponent(
-                    sessionToken
-                )}; HttpOnly; Path=/; Max-Age=${
-                    7 * 24 * 60 * 60
-                }; SameSite=Lax`
-            );
-
-            console.log(
-                "Owner logged in:",
-                owner.email
-            );
-
-            res.json({
-                message:
-                    "Owner login successful.",
-
-                owner: {
-                    name:
-                        owner.name,
-
-                    email:
-                        owner.email,
-
-                    course:
-                        owner.course
-                }
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Owner login error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Owner login failed."
+        if (!email || !password) {
+            return res.status(400).json({
+                message: "Gmail address and password are required."
             });
         }
-    }
-);
 
+        const cleanEmail = String(email).trim().toLowerCase();
 
-// =====================================================
-// OWNER ME
-// =====================================================
-
-app.get(
-    "/api/owner/me",
-    async (req, res) => {
-
-        try {
-
-            const owner =
-                await getLoggedInOwner(req);
-
-            if (!owner) {
-                return res.status(401).json({
-                    authenticated: false
-                });
-            }
-
-            res.json({
-                authenticated: true,
-
-                owner: {
-                    name:
-                        owner.name,
-
-                    email:
-                        owner.email,
-
-                    course:
-                        owner.course
-                }
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Owner me error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Failed to get owner information."
+        if (!/^[^\s@]+@gmail\.com$/i.test(cleanEmail)) {
+            return res.status(400).json({
+                message: "Please enter a valid Gmail address."
             });
         }
-    }
-);
 
+        const owner = await Owner.findOne({ email: cleanEmail });
 
-// =====================================================
-// OWNER LOGOUT
-// =====================================================
+        if (!owner) {
+            return res.status(401).json({
+                message: "Invalid Gmail address or password."
+            });
+        }
 
-app.post(
-    "/api/owner/logout",
-    (req, res) => {
-
-        res.setHeader(
-            "Set-Cookie",
-            `${OWNER_COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`
+        const passwordCorrect = await verifyPassword(
+            String(password),
+            owner.passwordHash
         );
 
+        if (!passwordCorrect) {
+            return res.status(401).json({
+                message: "Invalid Gmail address or password."
+            });
+        }
+
+        setSessionCookie(
+            req,
+            res,
+            OWNER_COOKIE_NAME,
+            createOwnerToken(owner._id.toString()),
+            OWNER_SESSION_SECONDS
+        );
+
+        console.log("Owner logged in:", owner.email);
+
         res.json({
-            message:
-                "Owner logged out."
+            message: "Owner login successful.",
+            owner: getPublicOwner(owner)
+        });
+
+    } catch (error) {
+        console.error("Owner login error:", error);
+
+        res.status(500).json({ message: "Owner login failed." });
+    }
+});
+
+app.get("/api/owner/me", async (req, res) => {
+    try {
+        const owner = await getLoggedInOwner(req);
+
+        if (!owner) {
+            return res.status(401).json({ authenticated: false });
+        }
+
+        res.json({
+            authenticated: true,
+            owner: getPublicOwner(owner)
+        });
+
+    } catch (error) {
+        console.error("Owner me error:", error);
+
+        res.status(500).json({
+            message: "Failed to get owner information."
         });
     }
-);
+});
+
+app.post("/api/owner/logout", (req, res) => {
+    clearSessionCookie(req, res, OWNER_COOKIE_NAME);
+
+    res.json({ message: "Owner logged out." });
+});
 
 
 // =====================================================
 // GET LOGGED-IN OWNER'S NFC
 // =====================================================
 
-app.get(
-    "/api/owner/nfc",
-    async (req, res) => {
+app.get("/api/owner/nfc", async (req, res) => {
+    try {
+        const owner = await getLoggedInOwner(req);
 
-        try {
-
-            const owner =
-                await getLoggedInOwner(req);
-
-            if (!owner) {
-                return res.status(401).json({
-                    message:
-                        "Owner login required."
-                });
-            }
-
-            const nfc =
-                await NFC.findOne({
-                    ownerId:
-                        owner._id
-                })
-                .sort({
-                    createdAt: -1
-                });
-
-            if (!nfc) {
-                return res.status(404).json({
-                    message:
-                        "No NFC is registered for this owner."
-                });
-            }
-
-            res.json({
-                nfc:
-                    getPublicNFC(nfc),
-
-                owner: {
-                    name:
-                        owner.name,
-
-                    email:
-                        owner.email,
-
-                    course:
-                        owner.course
-                }
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Get owner NFC error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Failed to find owner's NFC."
+        if (!owner) {
+            return res.status(401).json({
+                message: "Owner login required."
             });
         }
+
+        const nfc = await NFC.findOne({ ownerId: owner._id }).sort({
+            createdAt: -1
+        });
+
+        if (!nfc) {
+            return res.status(404).json({
+                message: "No NFC is registered for this owner."
+            });
+        }
+
+        res.json({
+            nfc: getPublicNFC(nfc),
+            owner: getPublicOwner(owner)
+        });
+
+    } catch (error) {
+        console.error("Get owner NFC error:", error);
+
+        res.status(500).json({ message: "Failed to find owner's NFC." });
     }
-);
+});
 
 
 // =====================================================
 // START FINDER CHAT
 // =====================================================
 
-app.post(
-    "/api/chat/start",
-    async (req, res) => {
+app.post("/api/chat/start", async (req, res) => {
+    try {
+        const { nfcId } = req.body || {};
 
-        try {
+        if (!nfcId) {
+            return res.status(400).json({ message: "NFC ID is required." });
+        }
 
-            const {
-                nfcId
-            } = req.body;
+        const nfc = await NFC.findOne({ nfcId: String(nfcId) });
 
-            console.log(
-                "Starting chat for NFC:",
-                nfcId
-            );
+        if (!nfc) {
+            return res.status(404).json({ message: "NFC not found." });
+        }
 
-            if (!nfcId) {
-                return res.status(400).json({
-                    message:
-                        "NFC ID is required."
-                });
-            }
+        // If the logged-in person is the owner, no finder chat is created
+        const owner = await getLoggedInOwner(req);
 
-            const nfc =
-                await NFC.findOne({
-                    nfcId:
-                        String(nfcId)
-                });
-
-            if (!nfc) {
-                return res.status(404).json({
-                    message:
-                        "NFC not found."
-                });
-            }
-
-            // Check if logged-in person is owner
-            const owner =
-                await getLoggedInOwner(req);
-
-            if (
-                owner &&
-                owner._id.toString() ===
-                    nfc.ownerId.toString()
-            ) {
-
-                return res.json({
-                    role: "owner",
-
-                    nfc:
-                        getPublicNFC(nfc),
-
-                    message:
-                        "You are the owner of this NFC."
-                });
-            }
-
-            // Create finder chat
-            const chatId =
-                "CHAT-" +
-                generateToken(12)
-                    .toUpperCase();
-
-            const finderToken =
-                generateToken(32);
-
-            const expiresAt =
-                new Date(
-                    Date.now() +
-                    60 * 60 * 1000
-                );
-
-            const chat =
-                new Chat({
-                    chatId,
-                    nfcId:
-                        String(nfcId),
-                    finderToken,
-                    expiresAt,
-                    status:
-                        "active"
-                });
-
-            await chat.save();
-
-            console.log(
-                "====================================="
-            );
-
-            console.log(
-                "Finder chat created"
-            );
-
-            console.log(
-                "NFC:",
-                nfcId
-            );
-
-            console.log(
-                "Chat ID:",
-                chatId
-            );
-
-            console.log(
-                "Expires:",
-                expiresAt
-            );
-
-            console.log(
-                "====================================="
-            );
-
-            // VERY IMPORTANT:
-            // Always return chatId and finderToken
-            return res.status(201).json({
-
-                role: "finder",
-
-                nfc:
-                    getPublicNFC(nfc),
-
-                nfcId:
-                    nfc.nfcId,
-
-                chatId:
-                    chat.chatId,
-
-                finderToken:
-                    chat.finderToken,
-
-                expiresAt:
-                    chat.expiresAt
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Start chat error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Unable to start chat.",
-                error:
-                    error.message
+        if (owner && owner._id.toString() === nfc.ownerId.toString()) {
+            return res.json({
+                role: "owner",
+                nfc: getPublicNFC(nfc),
+                message: "You are the owner of this NFC."
             });
         }
+
+        const chat = new Chat({
+            chatId: "CHAT-" + generateToken(12).toUpperCase(),
+            nfcId: String(nfcId),
+            finderToken: generateToken(32),
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+            status: "active"
+        });
+
+        await chat.save();
+
+        console.log("Finder chat created:", chat.chatId, "for", nfcId);
+
+        return res.status(201).json({
+            role: "finder",
+            nfc: getPublicNFC(nfc),
+            nfcId: nfc.nfcId,
+            chatId: chat.chatId,
+            finderToken: chat.finderToken,
+            expiresAt: chat.expiresAt
+        });
+
+    } catch (error) {
+        console.error("Start chat error:", error);
+
+        res.status(500).json({
+            message: "Unable to start chat.",
+            error: error.message
+        });
     }
-);
+});
 
 
 // =====================================================
 // CHAT AUTHORIZATION
 // =====================================================
 
-async function authorizeChat(
-    chat,
-    role,
-    token,
-    req
-) {
+async function authorizeChat(chat, role, token, req) {
+    if (!chat) return false;
+    if (chatIsExpired(chat)) return false;
 
-    if (!chat) {
-        return false;
-    }
-
-    if (
-        chatIsExpired(chat)
-    ) {
-        return false;
-    }
-
-    // FINDER
+    // Finder
     if (role === "finder") {
-
-        return secureCompare(
-            token,
-            chat.finderToken
-        );
+        return secureCompare(token, chat.finderToken);
     }
 
-    // OWNER
+    // Owner
     if (role === "owner") {
+        const nfc = await NFC.findOne({ nfcId: chat.nfcId });
 
-        const owner =
-            await getLoggedInOwner(req);
+        if (!nfc) return false;
 
-        if (owner) {
+        const owner = await getLoggedInOwner(req);
 
-            const nfc =
-                await NFC.findOne({
-                    nfcId:
-                        chat.nfcId
-                });
-
-            if (
-                nfc &&
-                owner._id.toString() ===
-                    nfc.ownerId.toString()
-            ) {
-                return true;
-            }
+        if (owner && owner._id.toString() === nfc.ownerId.toString()) {
+            return true;
         }
 
         // Old owner-token compatibility
-        if (token) {
-
-            const nfc =
-                await NFC.findOne({
-                    nfcId:
-                        chat.nfcId
-                });
-
-            if (
-                nfc &&
-                nfc.ownerToken &&
-                secureCompare(
-                    token,
-                    nfc.ownerToken
-                )
-            ) {
-                return true;
-            }
+        if (token && nfc.ownerToken && secureCompare(token, nfc.ownerToken)) {
+            return true;
         }
     }
 
@@ -1800,614 +983,287 @@ async function authorizeChat(
 // GET CHAT MESSAGES
 // =====================================================
 
-app.get(
-    "/api/chat/:chatId/messages",
-    async (req, res) => {
+app.get("/api/chat/:chatId/messages", async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const role = req.headers["x-chat-role"];
+        const token = req.headers["x-chat-token"];
 
-        try {
+        if (!chatId) {
+            return res.status(400).json({ message: "Chat ID is missing." });
+        }
 
-            const {
-                chatId
-            } = req.params;
+        const chat = await Chat.findOne({ chatId });
 
-            const role =
-                req.headers[
-                    "x-chat-role"
-                ];
+        if (!chat) {
+            return res.status(404).json({ message: "Chat not found." });
+        }
 
-            const token =
-                req.headers[
-                    "x-chat-token"
-                ];
+        if (chatIsExpired(chat)) {
+            chat.status = "expired";
+            await chat.save();
 
-            if (!chatId) {
-                return res.status(400).json({
-                    message:
-                        "Chat ID is missing."
-                });
-            }
-
-            const chat =
-                await Chat.findOne({
-                    chatId
-                });
-
-            if (!chat) {
-                return res.status(404).json({
-                    message:
-                        "Chat not found."
-                });
-            }
-
-            if (
-                chatIsExpired(chat)
-            ) {
-
-                chat.status =
-                    "expired";
-
-                await chat.save();
-
-                return res.status(410).json({
-                    message:
-                        "This chat has expired."
-                });
-            }
-
-            const authorized =
-                await authorizeChat(
-                    chat,
-                    role,
-                    token,
-                    req
-                );
-
-            if (!authorized) {
-                return res.status(403).json({
-                    message:
-                        "Unauthorized chat access."
-                });
-            }
-
-            const messages =
-                await Message.find({
-                    chatId
-                })
-                .sort({
-                    sentAt: 1
-                });
-
-            res.json({
-                messages,
-                expiresAt:
-                    chat.expiresAt
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Get messages error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Failed to get messages."
+            return res.status(410).json({
+                message: "This chat has expired."
             });
         }
+
+        const authorized = await authorizeChat(chat, role, token, req);
+
+        if (!authorized) {
+            return res.status(403).json({
+                message: "Unauthorized chat access."
+            });
+        }
+
+        const messages = await Message.find({ chatId }).sort({ sentAt: 1 });
+
+        res.json({
+            messages,
+            expiresAt: chat.expiresAt
+        });
+
+    } catch (error) {
+        console.error("Get messages error:", error);
+
+        res.status(500).json({ message: "Failed to get messages." });
     }
-);
+});
 
 
 // =====================================================
 // SEND CHAT MESSAGE
 // =====================================================
 
-app.post(
-    "/api/chat/:chatId/messages",
-    async (req, res) => {
+app.post("/api/chat/:chatId/messages", async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const { message } = req.body || {};
+        const role = req.headers["x-chat-role"];
+        const token = req.headers["x-chat-token"];
 
-        try {
-
-            const {
-                chatId
-            } = req.params;
-
-            const {
-                message
-            } = req.body;
-
-            const role =
-                req.headers[
-                    "x-chat-role"
-                ];
-
-            const token =
-                req.headers[
-                    "x-chat-token"
-                ];
-
-            if (!message ||
-                !String(message).trim()
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Message cannot be empty."
-                });
-            }
-
-            if (
-                !["finder", "owner"]
-                    .includes(role)
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Invalid chat role."
-                });
-            }
-
-            if (!chatId ||
-                chatId === "undefined"
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Chat ID is missing."
-                });
-            }
-
-            const chat =
-                await Chat.findOne({
-                    chatId
-                });
-
-            if (!chat) {
-                return res.status(404).json({
-                    message:
-                        "Chat not found."
-                });
-            }
-
-            if (
-                chatIsExpired(chat)
-            ) {
-
-                chat.status =
-                    "expired";
-
-                await chat.save();
-
-                return res.status(410).json({
-                    message:
-                        "This chat has expired."
-                });
-            }
-
-            const authorized =
-                await authorizeChat(
-                    chat,
-                    role,
-                    token,
-                    req
-                );
-
-            if (!authorized) {
-                return res.status(403).json({
-                    message:
-                        "Unauthorized chat access."
-                });
-            }
-
-            const newMessage =
-                new Message({
-                    chatId,
-                    sender:
-                        role,
-                    message:
-                        String(message)
-                            .trim()
-                            .substring(
-                                0,
-                                500
-                            )
-                });
-
-            await newMessage.save();
-
-            res.status(201).json(
-                newMessage
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Send message error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Failed to send message."
+        if (!message || !String(message).trim()) {
+            return res.status(400).json({
+                message: "Message cannot be empty."
             });
         }
+
+        if (!["finder", "owner"].includes(role)) {
+            return res.status(400).json({ message: "Invalid chat role." });
+        }
+
+        if (!chatId || chatId === "undefined") {
+            return res.status(400).json({ message: "Chat ID is missing." });
+        }
+
+        const chat = await Chat.findOne({ chatId });
+
+        if (!chat) {
+            return res.status(404).json({ message: "Chat not found." });
+        }
+
+        if (chatIsExpired(chat)) {
+            chat.status = "expired";
+            await chat.save();
+
+            return res.status(410).json({
+                message: "This chat has expired."
+            });
+        }
+
+        const authorized = await authorizeChat(chat, role, token, req);
+
+        if (!authorized) {
+            return res.status(403).json({
+                message: "Unauthorized chat access."
+            });
+        }
+
+        const newMessage = new Message({
+            chatId,
+            sender: role,
+            message: String(message).trim().substring(0, 500)
+        });
+
+        await newMessage.save();
+
+        res.status(201).json(newMessage);
+
+    } catch (error) {
+        console.error("Send message error:", error);
+
+        res.status(500).json({ message: "Failed to send message." });
     }
-);
+});
 
 
 // =====================================================
 // OWNER CHAT LIST
 // =====================================================
 
-app.get(
-    "/api/owner/:nfcId/chats",
-    async (req, res) => {
+app.get("/api/owner/:nfcId/chats", async (req, res) => {
+    try {
+        const owner = await getLoggedInOwner(req);
 
-        try {
-
-            const owner =
-                await getLoggedInOwner(req);
-
-            if (!owner) {
-                return res.status(401).json({
-                    message:
-                        "Owner login required."
-                });
-            }
-
-            const nfc =
-                await NFC.findOne({
-                    nfcId:
-                        req.params.nfcId
-                });
-
-            if (!nfc) {
-                return res.status(404).json({
-                    message:
-                        "NFC not found."
-                });
-            }
-
-            if (
-                owner._id.toString() !==
-                nfc.ownerId.toString()
-            ) {
-                return res.status(403).json({
-                    message:
-                        "You are not the owner of this NFC."
-                });
-            }
-
-            const chats =
-                await Chat.find({
-                    nfcId:
-                        req.params.nfcId
-                })
-                .sort({
-                    createdAt: -1
-                });
-
-            res.json({
-
-                nfc:
-                    getPublicNFC(nfc),
-
-                chats
-
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Owner chats error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Failed to load owner chats."
+        if (!owner) {
+            return res.status(401).json({
+                message: "Owner login required."
             });
         }
+
+        const nfc = await NFC.findOne({ nfcId: req.params.nfcId });
+
+        if (!nfc) {
+            return res.status(404).json({ message: "NFC not found." });
+        }
+
+        if (owner._id.toString() !== nfc.ownerId.toString()) {
+            return res.status(403).json({
+                message: "You are not the owner of this NFC."
+            });
+        }
+
+        const chats = await Chat.find({ nfcId: req.params.nfcId }).sort({
+            createdAt: -1
+        });
+
+        res.json({
+            nfc: getPublicNFC(nfc),
+            chats
+        });
+
+    } catch (error) {
+        console.error("Owner chats error:", error);
+
+        res.status(500).json({ message: "Failed to load owner chats." });
     }
-);
+});
 
 
 // =====================================================
 // OWNER OPEN CHAT
 // =====================================================
 
-app.get(
-    "/api/owner/:nfcId/chat/:chatId",
-    async (req, res) => {
+app.get("/api/owner/:nfcId/chat/:chatId", async (req, res) => {
+    try {
+        const owner = await getLoggedInOwner(req);
 
-        try {
-
-            const owner =
-                await getLoggedInOwner(req);
-
-            if (!owner) {
-                return res.status(401).json({
-                    message:
-                        "Owner login required."
-                });
-            }
-
-            const nfc =
-                await NFC.findOne({
-                    nfcId:
-                        req.params.nfcId
-                });
-
-            if (!nfc) {
-                return res.status(404).json({
-                    message:
-                        "NFC not found."
-                });
-            }
-
-            if (
-                owner._id.toString() !==
-                nfc.ownerId.toString()
-            ) {
-                return res.status(403).json({
-                    message:
-                        "You are not the owner of this NFC."
-                });
-            }
-
-            const chat =
-                await Chat.findOne({
-                    chatId:
-                        req.params.chatId,
-
-                    nfcId:
-                        req.params.nfcId
-                });
-
-            if (!chat) {
-                return res.status(404).json({
-                    message:
-                        "Chat not found."
-                });
-            }
-
-            if (
-                chatIsExpired(chat)
-            ) {
-
-                chat.status =
-                    "expired";
-
-                await chat.save();
-
-                return res.status(410).json({
-                    message:
-                        "This chat has expired."
-                });
-            }
-
-            res.json({
-
-                role:
-                    "owner",
-
-                authenticated:
-                    true,
-
-                nfc:
-                    getPublicNFC(nfc),
-
-                chatId:
-                    chat.chatId,
-
-                expiresAt:
-                    chat.expiresAt
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Owner open chat error:",
-                error
-            );
-
-            res.status(500).json({
-                message:
-                    "Failed to open owner chat."
+        if (!owner) {
+            return res.status(401).json({
+                message: "Owner login required."
             });
         }
+
+        const nfc = await NFC.findOne({ nfcId: req.params.nfcId });
+
+        if (!nfc) {
+            return res.status(404).json({ message: "NFC not found." });
+        }
+
+        if (owner._id.toString() !== nfc.ownerId.toString()) {
+            return res.status(403).json({
+                message: "You are not the owner of this NFC."
+            });
+        }
+
+        const chat = await Chat.findOne({
+            chatId: req.params.chatId,
+            nfcId: req.params.nfcId
+        });
+
+        if (!chat) {
+            return res.status(404).json({ message: "Chat not found." });
+        }
+
+        if (chatIsExpired(chat)) {
+            chat.status = "expired";
+            await chat.save();
+
+            return res.status(410).json({
+                message: "This chat has expired."
+            });
+        }
+
+        res.json({
+            role: "owner",
+            authenticated: true,
+            nfc: getPublicNFC(nfc),
+            chatId: chat.chatId,
+            expiresAt: chat.expiresAt
+        });
+
+    } catch (error) {
+        console.error("Owner open chat error:", error);
+
+        res.status(500).json({ message: "Failed to open owner chat." });
     }
-);
+});
 
 
 // =====================================================
-// FRONTEND ROUTES
+// FRONTEND ROUTES (local development)
+// On Netlify, static files are served by the CDN and
+// /nfc/* is rewritten to /nfc.html in netlify.toml.
 // =====================================================
 
-app.get(
-    "/",
-    (req, res) => {
+function sendPage(fileName) {
+    return (req, res) => {
+        res.sendFile(path.join(__dirname, fileName));
+    };
+}
 
-        res.sendFile(
-            path.join(
-                __dirname,
-                "index.html"
-            )
-        );
-    }
-);
-
-
-app.get(
-    "/register.html",
-    (req, res) => {
-
-        res.sendFile(
-            path.join(
-                __dirname,
-                "register.html"
-            )
-        );
-    }
-);
-
-
-app.get(
-    "/login.html",
-    (req, res) => {
-
-        res.sendFile(
-            path.join(
-                __dirname,
-                "login.html"
-            )
-        );
-    }
-);
-
-
-app.get(
-    "/admin.html",
-    (req, res) => {
-
-        res.sendFile(
-            path.join(
-                __dirname,
-                "admin.html"
-            )
-        );
-    }
-);
-
-
-// NFC public URL
-
-app.get(
-    "/nfc/:nfcId",
-    (req, res) => {
-        res.sendFile(
-            path.join(
-                __dirname,
-                "nfc.html"
-            )
-        );
-    }
-);  
-
-
-app.get(
-    "/chat.html",
-    (req, res) => {
-
-        res.sendFile(
-            path.join(
-                __dirname,
-                "chat.html"
-            )
-        );
-    }
-);
-
-
-app.get(
-    "/owner.html",
-    (req, res) => {
-
-        res.sendFile(
-            path.join(
-                __dirname,
-                "owner.html"
-            )
-        );
-    }
-);
+app.get("/", sendPage("index.html"));
+app.get("/register.html", sendPage("register.html"));
+app.get("/login.html", sendPage("login.html"));
+app.get("/admin.html", sendPage("admin.html"));
+app.get("/chat.html", sendPage("chat.html"));
+app.get("/owner.html", sendPage("owner.html"));
+app.get("/nfc/:nfcId", sendPage("nfc.html"));
 
 
 // =====================================================
 // 404 API HANDLER
 // =====================================================
 
-app.use(
-    "/api",
-    (req, res) => {
+app.use("/api", (req, res) => {
+    console.log("API endpoint not found:", req.method, req.originalUrl);
 
-        console.log(
-            "API endpoint not found:",
-            req.method,
-            req.originalUrl
-        );
-
-        res.status(404).json({
-            message:
-                "API endpoint not found."
-        });
-    }
-);
+    res.status(404).json({ message: "API endpoint not found." });
+});
 
 
 // =====================================================
 // ERROR HANDLER
 // =====================================================
 
-app.use(
-    (error, req, res, next) => {
+app.use((error, req, res, next) => {
+    console.error("Unhandled server error:", error);
 
-        console.error(
-            "Unhandled server error:",
-            error
-        );
-
-        res.status(500).json({
-            message:
-                "Internal server error."
-        });
-    }
-);
+    res.status(500).json({ message: "Internal server error." });
+});
 
 
 // =====================================================
 // START SERVER
+// Local:   node server.js   -> listens on a port
+// Netlify: required by netlify/functions/api.js -> no listen
 // =====================================================
 
-const PORT =
-    process.env.PORT || 5000;
-
+const PORT = process.env.PORT || 5000;
 
 async function startServer() {
-
     await connectMongoDB();
 
-    app.listen(
-        PORT,
-        () => {
-
-            console.log(
-                "====================================="
-            );
-
-            console.log(
-                `TNF server running on port ${PORT}`
-            );
-
-            console.log(
-                `http://localhost:${PORT}`
-            );
-
-            console.log(
-                "Gmail owner authentication enabled"
-            );
-
-            console.log(
-                "Finder/Owner private chat enabled"
-            );
-
-            console.log(
-                "====================================="
-            );
-        }
-    );
+    app.listen(PORT, () => {
+        console.log("=====================================");
+        console.log(`TNF server running on port ${PORT}`);
+        console.log(`http://localhost:${PORT}`);
+        console.log("=====================================");
+    });
 }
 
-
-startServer();
-
+if (require.main === module) {
+    startServer();
+}
 
 module.exports = app;
