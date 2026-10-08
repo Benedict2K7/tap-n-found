@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Owner Dashboard - Tap N Found
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="./owner-dashboard.css"
+    >
+
+</head>
+
+
+<body>
+
+
+    <!-- =================================================
+         NAVBAR
+    ================================================== -->
+
+    <header class="navbar">
+
+        <div class="nav-container">
+
+            <a
+                href="index.html"
+                class="logo"
+            >
+
+                <span class="logo-main">
+                    TNF
+                </span>
+
+                <span class="logo-text">
+                    Tap N Found
+                </span>
+
+            </a>
+
+
+            <button
+                class="logout-button"
+                id="logoutButton"
+            >
+                Logout
+            </button>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- =================================================
+         DASHBOARD
+    ================================================== -->
+
+    <main class="dashboard-page">
+
+        <div class="dashboard-container">
+
+
+            <!-- =================================================
+                 WELCOME
+            ================================================== -->
+
+            <section class="welcome-section">
+
+                <div>
+
+                    <div class="eyebrow">
+                        OWNER DASHBOARD
+                    </div>
+
+                    <h1>
+                        Welcome,
+                        <span id="ownerName">
+                            Owner
+                        </span>
+                    </h1>
+
+                    <p>
+                        Manage your Tap N Found registered items
+                        and communicate privately with finders.
+                    </p>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =================================================
+                 OWNER INFORMATION
+            ================================================== -->
+
+            <section class="profile-card">
+
+                <div class="profile-item">
+
+                    <span class="profile-label">
+                        Name
+                    </span>
+
+                    <strong id="profileName">
+                        -
+                    </strong>
+
+                </div>
+
+
+                <div class="profile-item">
+
+                    <span class="profile-label">
+                        Phone Number
+                    </span>
+
+                    <strong id="profilePhone">
+                        -
+                    </strong>
+
+                </div>
+
+
+                <div class="profile-item">
+
+                    <span class="profile-label">
+                        Course
+                    </span>
+
+                    <strong id="profileCourse">
+                        -
+                    </strong>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =================================================
+                 NFC ITEMS
+            ================================================== -->
+
+            <section class="items-section">
+
+                <div class="section-title">
+
+                    <div>
+
+                        <div class="eyebrow">
+                            YOUR NFC ITEMS
+                        </div>
+
+                        <h2>
+                            Registered Items
+                        </h2>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="items-grid"
+                    id="itemsContainer"
+                >
+
+                    <div class="loading">
+                        Loading your items...
+                    </div>
+
+                </div>
+
+            </section>
+
+
+        </div>
+
+    </main>
+
+
+
+    <script src="./owner-dashboard.js"></script>
+
+</body>
+
+</html>

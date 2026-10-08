@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Tap N Found - Private Chat</title>
+
+    <link rel="stylesheet" href="chat.css">
+</head>
+
+<body>
+
+    <div class="chat-container">
+
+        <div class="chat-header">
+            <div>
+                <h2>Tap N Found</h2>
+                <p id="itemInfo">Private chat</p>
+            </div>
+
+            <div id="timer" class="timer">
+                60:00
+            </div>
+        </div>
+
+
+        <div id="chatMessages" class="chat-messages">
+
+            <div class="system-message">
+                Starting private chat...
+            </div>
+
+        </div>
+
+
+        <div id="chatError" class="chat-error"></div>
+
+
+        <form id="messageForm" class="message-form">
+
+            <input
+                type="text"
+                id="messageInput"
+                placeholder="Type your message..."
+                maxlength="500"
+                autocomplete="off"
+                required
+            >
+
+            <button
+                type="submit"
+                id="sendButton"
+            >
+                Send
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <script src="chat.js"></script>
+
+</body>
+</html>

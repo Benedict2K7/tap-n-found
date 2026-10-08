@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Owner Login - Tap N Found</title>
+
+    <link
+        rel="stylesheet"
+        href="./login.css"
+    >
+
+</head>
+
+
+<body>
+
+
+    <!-- ================= NAVBAR ================= -->
+
+    <header class="navbar">
+
+        <div class="nav-container">
+
+            <a
+                href="index.html"
+                class="logo"
+            >
+
+                <span class="logo-main">
+                    TNF
+                </span>
+
+                <span class="logo-text">
+                    Tap N Found
+                </span>
+
+            </a>
+
+
+            <a
+                href="index.html"
+                class="back-button"
+            >
+                ← Back
+            </a>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- ================= LOGIN PAGE ================= -->
+
+    <main class="login-page">
+
+        <div class="login-container">
+
+
+            <!-- HEADER -->
+
+            <div class="login-header">
+
+                <div class="eyebrow">
+                    TAP N FOUND
+                </div>
+
+                <h1>
+                    Owner Login
+                </h1>
+
+                <p>
+                    Login using your Gmail address to
+                    manage your registered NFC item and
+                    communicate privately with finders.
+                </p>
+
+            </div>
+
+
+
+            <!-- LOGIN FORM -->
+
+            <form
+                class="login-form"
+                id="loginForm"
+            >
+
+
+                <!-- GMAIL -->
+
+                <div class="form-group">
+
+                    <label for="email">
+                        Gmail Address
+                    </label>
+
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder="Enter your Gmail address"
+                        autocomplete="email"
+                        inputmode="email"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- PASSWORD -->
+
+                <div class="form-group">
+
+                    <label for="password">
+                        Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="Enter your password"
+                        autocomplete="current-password"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- LOGIN BUTTON -->
+
+                <button
+                    type="submit"
+                    class="login-button"
+                    id="loginButton"
+                >
+
+                    <span id="loginText">
+                        Login
+                    </span>
+
+                    <span>
+                        →
+                    </span>
+
+                </button>
+
+
+            </form>
+
+
+
+            <!-- REGISTER LINK -->
+
+            <div class="register-link">
+
+                <span>
+                    Don't have an account?
+                </span>
+
+                <a href="register.html">
+                    Register your NFC
+                </a>
+
+            </div>
+
+
+        </div>
+
+    </main>
+
+
+
+    <!-- JAVASCRIPT -->
+
+    <script src="./login.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,394 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #eaf6ff;
+    min-height: 100vh;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    padding: 20px;
+}
+
+
+/* =====================================================
+   CHAT CONTAINER
+   ===================================================== */
+
+.chat-container {
+    width: 100%;
+    max-width: 500px;
+
+    height: 700px;
+    max-height: 90vh;
+
+    background: white;
+
+    border-radius: 18px;
+
+    box-shadow:
+        0 8px 30px rgba(0, 0, 0, 0.12);
+
+    overflow: hidden;
+
+    display: flex;
+    flex-direction: column;
+}
+
+
+/* =====================================================
+   CHAT HEADER
+   ===================================================== */
+
+.chat-header {
+    background: #061b35;
+    color: white;
+
+    padding: 18px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-header h2 {
+    font-size: 20px;
+    margin-bottom: 4px;
+}
+
+.chat-header p {
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+
+/* =====================================================
+   TIMER
+   ===================================================== */
+
+.timer {
+    background: #2864ee;
+
+    padding: 8px 12px;
+
+    border-radius: 20px;
+
+    font-size: 13px;
+    font-weight: bold;
+
+    white-space: nowrap;
+}
+
+
+/* =====================================================
+   CHAT MESSAGES AREA
+   ===================================================== */
+
+.chat-messages {
+    flex: 1;
+
+    padding: 18px;
+
+    overflow-y: auto;
+
+    background: #f6fbff;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 4px;
+}
+
+
+/* =====================================================
+   EVERY MESSAGE
+   ===================================================== */
+
+.message {
+    width: 100%;
+
+    display: flex;
+
+    margin: 4px 0;
+
+    box-sizing: border-box;
+}
+
+
+/* =====================================================
+   MY MESSAGE
+   RIGHT SIDE
+   ===================================================== */
+
+.message.mine {
+    justify-content: flex-end;
+}
+
+
+/* =====================================================
+   OTHER PERSON'S MESSAGE
+   LEFT SIDE
+   ===================================================== */
+
+.message.theirs {
+    justify-content: flex-start;
+}
+
+
+/* =====================================================
+   MESSAGE BUBBLE
+   ===================================================== */
+
+.message-bubble {
+    max-width: 75%;
+
+    width: fit-content;
+
+    padding: 10px 14px;
+
+    border-radius: 17px;
+
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+
+    font-size: 14px;
+
+    line-height: 1.4;
+}
+
+
+/* =====================================================
+   MY MESSAGE - BLUE
+   ===================================================== */
+
+.message.mine .message-bubble {
+    background: #2864ee;
+
+    color: white;
+
+    border-bottom-right-radius: 5px;
+}
+
+
+/* =====================================================
+   OTHER PERSON - GREY
+   ===================================================== */
+
+.message.theirs .message-bubble {
+    background: #e4e9ef;
+
+    color: #111827;
+
+    border-bottom-left-radius: 5px;
+}
+
+
+/* =====================================================
+   MESSAGE TEXT
+   ===================================================== */
+
+.message-text {
+    white-space: pre-wrap;
+
+    line-height: 1.4;
+}
+
+
+/* =====================================================
+   MESSAGE TIME
+   ===================================================== */
+
+.message-time {
+    font-size: 10px;
+
+    opacity: 0.65;
+
+    margin-top: 4px;
+}
+
+
+/* My message time */
+
+.message.mine .message-time {
+    text-align: right;
+}
+
+
+/* Other person's message time */
+
+.message.theirs .message-time {
+    text-align: left;
+}
+
+
+/* =====================================================
+   SYSTEM MESSAGE
+   ===================================================== */
+
+.system-message {
+    text-align: center;
+
+    font-size: 12px;
+
+    color: #6b7280;
+
+    padding: 10px;
+
+    margin: 5px 0;
+}
+
+
+/* =====================================================
+   ERROR
+   ===================================================== */
+
+.chat-error {
+    color: #c62828;
+
+    font-size: 13px;
+
+    text-align: center;
+
+    padding: 0 15px 8px;
+}
+
+
+/* =====================================================
+   MESSAGE FORM
+   ===================================================== */
+
+.message-form {
+    display: flex;
+
+    gap: 8px;
+
+    padding: 12px;
+
+    background: white;
+
+    border-top: 1px solid #e5e7eb;
+}
+
+
+/* =====================================================
+   MESSAGE INPUT
+   ===================================================== */
+
+.message-form input {
+    flex: 1;
+
+    min-width: 0;
+
+    padding: 12px 14px;
+
+    border: 1px solid #d1d5db;
+
+    border-radius: 24px;
+
+    font-size: 14px;
+
+    outline: none;
+}
+
+.message-form input:focus {
+    border-color: #2864ee;
+}
+
+
+/* =====================================================
+   SEND BUTTON
+   ===================================================== */
+
+.message-form button {
+    border: none;
+
+    background: #2864ee;
+
+    color: white;
+
+    padding: 0 20px;
+
+    border-radius: 24px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+
+    transition: 0.2s;
+}
+
+.message-form button:hover {
+    background: #1f55d5;
+}
+
+.message-form button:disabled {
+    opacity: 0.6;
+
+    cursor: not-allowed;
+}
+
+
+/* =====================================================
+   SCROLLBAR
+   ===================================================== */
+
+.chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+
+    border-radius: 10px;
+}
+
+
+/* =====================================================
+   MOBILE
+   ===================================================== */
+
+@media (max-width: 600px) {
+
+    body {
+        padding: 0;
+    }
+
+    .chat-container {
+        max-width: none;
+
+        width: 100%;
+
+        height: 100vh;
+
+        max-height: none;
+
+        border-radius: 0;
+    }
+
+    .message-bubble {
+        max-width: 80%;
+    }
+
+    .chat-header {
+        padding: 16px;
+    }
+
+    .chat-messages {
+        padding: 14px;
+    }
+
+    .message-form {
+        padding: 10px;
+    }
+
+}

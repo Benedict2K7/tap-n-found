@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Tap N Found - Owner</title>
+
+    <link
+        rel="stylesheet"
+        href="owner.css"
+    >
+</head>
+
+<body>
+
+    <div class="owner-container">
+
+        <header class="owner-header">
+
+            <div>
+                <h1>Tap N Found</h1>
+                <p id="itemInfo">Owner Dashboard</p>
+            </div>
+
+            <div class="online-dot">
+                ●
+            </div>
+
+        </header>
+
+
+        <main class="owner-content">
+
+            <div class="page-title">
+
+                <div>
+                    <h2>Your Messages</h2>
+
+                    <p>
+                        Private chats from people who found your item.
+                    </p>
+                </div>
+
+                <button
+                    id="refreshButton"
+                    class="refresh-button"
+                >
+                    Refresh
+                </button>
+
+            </div>
+
+
+            <div
+                id="errorMessage"
+                class="error-message"
+            ></div>
+
+
+            <div
+                id="loadingMessage"
+                class="loading-message"
+            >
+                Loading chats...
+            </div>
+
+
+            <div
+                id="emptyMessage"
+                class="empty-message hidden"
+            >
+                <div class="empty-icon">
+                    💬
+                </div>
+
+                <h3>No chats yet</h3>
+
+                <p>
+                    When someone finds your item and starts a chat,
+                    it will appear here.
+                </p>
+            </div>
+
+
+            <div
+                id="chatList"
+                class="chat-list"
+            ></div>
+
+        </main>
+
+    </div>
+
+
+    <script src="owner.js"></script>
+
+</body>
+
+</html>
+```
