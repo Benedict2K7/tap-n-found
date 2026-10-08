@@ -35,29 +35,46 @@ app.use((req, res, next) => {
 
 const ALLOWED_ORIGINS = [
     "https://tap-n-found.netlify.app",
+    "https://tap-n-found.onrender.com",
     "http://localhost:5000",
     "http://localhost:8888"
 ];
-
 app.use(
     cors({
         origin: (origin, callback) => {
-            // Same-origin requests and tools without an Origin header
-            if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+
+            // Allow requests without an Origin header
+            if (!origin) {
                 return callback(null, true);
             }
-            return callback(null, false);
+
+            // Allow approved frontend origins
+            if (ALLOWED_ORIGINS.includes(origin)) {
+                return callback(null, true);
+            }
+
+            // Reject unknown origins
+            return callback(new Error("CORS: Origin not allowed"));
         },
-        credentials: true
+
+        credentials: true,
+
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+
+        allowedHeaders: [
+            "Content-Type",
+            "Authorization",
+            "X-Chat-Role",
+            "X-Chat-Token"
+        ]
     })
 );
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve frontend files (local development; Netlify serves these itself)
+// Serve frontend files locally
 app.use(express.static(__dirname));
-
 
 // =====================================================
 // SCHEMAS

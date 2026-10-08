@@ -97,6 +97,8 @@
 <body>
 
 ```
+<!-- ================= NAVBAR ================= -->
+
 <header class="navbar">
 
     <div class="nav-container">
@@ -110,6 +112,8 @@
 
 </header>
 
+
+<!-- ================= NFC PAGE ================= -->
 
 <main class="nfc-page">
 
@@ -126,7 +130,9 @@
         </div>
 
 
-        <div id="details" class="nfc-details" style="display:none;">
+        <!-- ================= NFC DETAILS ================= -->
+
+        <div id="details" class="nfc-details" style="display: none;">
 
             <div>
                 <span class="nfc-label">NFC ID:</span>
@@ -149,12 +155,15 @@
             </div>
 
 
+            <!-- ================= CHAT BUTTON ================= -->
+
             <button
                 id="chatButton"
                 class="chat-button"
                 type="button"
+                disabled
             >
-                Start Private Chat
+                Loading...
             </button>
 
         </div>
@@ -164,56 +173,51 @@
 </main>
 
 
+<!-- ================= JAVASCRIPT ================= -->
+
 <script>
 
     // =====================================================
     // BACKEND URL
     // =====================================================
-    //
-    // Your backend is deployed on Render.
-    //
-    // IMPORTANT:
-    // Do NOT put the Netlify frontend URL here.
-    //
+
     const API_URL = "https://tap-n-found.onrender.com";
-    //
-    // =====================================================
 
 
     // =====================================================
-    // GET NFC ID
-    // =====================================================
-    //
-    // Supports:
-    //
-    // 1. /nfc/TNF-MUZ5328W
-    //
-    // 2. /nfc.html?nfcId=TNF-MUZ5328W
-    //
+    // GET NFC ID FROM URL
     // =====================================================
 
     function getNfcIdFromUrl() {
 
-        // First check query parameter
+        // -----------------------------------------------
+        // OPTION 1:
+        // /nfc.html?nfcId=TNF-MUZ5328W
+        // -----------------------------------------------
 
-        const params =
-            new URLSearchParams(window.location.search);
+        const params = new URLSearchParams(
+            window.location.search
+        );
 
-        const queryNfcId =
-            params.get("nfcId");
+        const queryNfcId = params.get("nfcId");
 
         if (queryNfcId) {
+
             return queryNfcId.trim();
+
         }
 
 
-        // Then check URL path
+        // -----------------------------------------------
+        // OPTION 2:
+        // /nfc/TNF-MUZ5328W
+        // -----------------------------------------------
 
-        const path =
-            window.location.pathname;
+        const path = window.location.pathname;
 
-        const match =
-            path.match(/^\/nfc\/([^\/]+)\/?$/i);
+        const match = path.match(
+            /^\/nfc\/([^\/]+)\/?$/i
+        );
 
         if (match && match[1]) {
 
@@ -228,15 +232,14 @@
 
 
     // =====================================================
-    // GET NFC ID
+    // NFC ID
     // =====================================================
 
-    const nfcId =
-        getNfcIdFromUrl();
+    const nfcId = getNfcIdFromUrl();
 
 
     // =====================================================
-    // ELEMENTS
+    // HTML ELEMENTS
     // =====================================================
 
     const statusElement =
@@ -262,7 +265,7 @@
 
 
     // =====================================================
-    // CHECK NFC ID
+    // START
     // =====================================================
 
     if (!nfcId) {
@@ -271,6 +274,8 @@
             "NFC ID is missing.";
 
         statusElement.classList.add("error");
+
+        chatButton.disabled = true;
 
     } else {
 
@@ -296,7 +301,9 @@
                 "Checking NFC...";
 
 
-            // Make sure ID starts with TNF-
+            // ---------------------------------------------
+            // CHECK NFC FORMAT
+            // ---------------------------------------------
 
             if (
                 !nfcId
@@ -311,9 +318,9 @@
             }
 
 
-            // =================================================
-            // IDENTIFY API URL
-            // =================================================
+            // ---------------------------------------------
+            // IDENTIFY API
+            // ---------------------------------------------
 
             const identifyUrl =
                 `${API_URL}/api/nfc/${encodeURIComponent(nfcId)}/identify`;
@@ -324,22 +331,39 @@
             );
 
 
-            // =================================================
-            // IDENTIFY OWNER / FINDER
-            // =================================================
+            // ---------------------------------------------
+            // FETCH NFC
+            // ---------------------------------------------
 
-            const response =
-                await fetch(
-                    identifyUrl,
-                    {
-                        method: "GET",
-                        credentials: "include"
+            const response = await fetch(
+                identifyUrl,
+                {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Accept": "application/json"
                     }
+                }
+            );
+
+
+            // ---------------------------------------------
+            // READ RESPONSE
+            // ---------------------------------------------
+
+            let data;
+
+            try {
+
+                data = await response.json();
+
+            } catch (jsonError) {
+
+                throw new Error(
+                    `Server returned an invalid response. HTTP ${response.status}`
                 );
 
-
-            const data =
-                await response.json();
+            }
 
 
             console.log(
@@ -348,36 +372,49 @@
             );
 
 
+            // ---------------------------------------------
+            // CHECK HTTP STATUS
+            // ---------------------------------------------
+
             if (!response.ok) {
 
                 throw new Error(
                     data.message ||
                     data.error ||
-                    "NFC not found."
+                    `NFC request failed. HTTP ${response.status}`
                 );
 
             }
 
 
-            // =================================================
+            // ---------------------------------------------
+            // CHECK NFC DATA
+            // ---------------------------------------------
+
+            if (!data.nfc) {
+
+                throw new Error(
+                    "NFC information was not returned by the server."
+                );
+
+            }
+
+
+            const nfc = data.nfc;
+
+
+            // ---------------------------------------------
             // DISPLAY NFC INFORMATION
-            // =================================================
-
-            const nfc =
-                data.nfc;
-
+            // ---------------------------------------------
 
             nfcIdElement.textContent =
                 nfc.nfcId || nfcId;
 
-
             itemElement.textContent =
                 nfc.item || "Unknown";
 
-
             courseElement.textContent =
                 nfc.course || "Not available";
-
 
             nfcStatusElement.textContent =
                 nfc.status || "Unknown";
@@ -387,9 +424,9 @@
                 "block";
 
 
-            // =================================================
+            // ---------------------------------------------
             // OWNER
-            // =================================================
+            // ---------------------------------------------
 
             if (data.role === "owner") {
 
@@ -404,6 +441,8 @@
                     "success"
                 );
 
+
+                chatButton.disabled = false;
 
                 chatButton.textContent =
                     "Open Owner Dashboard";
@@ -422,9 +461,9 @@
             }
 
 
-            // =================================================
+            // ---------------------------------------------
             // FINDER
-            // =================================================
+            // ---------------------------------------------
 
             if (data.role === "finder") {
 
@@ -440,6 +479,8 @@
                 );
 
 
+                chatButton.disabled = false;
+
                 chatButton.textContent =
                     "Start Private Chat";
 
@@ -452,14 +493,13 @@
             }
 
 
-            // =================================================
+            // ---------------------------------------------
             // UNKNOWN ROLE
-            // =================================================
+            // ---------------------------------------------
 
             throw new Error(
                 "Unable to determine NFC user role."
             );
-
 
         } catch (error) {
 
@@ -478,7 +518,6 @@
                 "success"
             );
 
-
             statusElement.classList.add(
                 "error"
             );
@@ -486,6 +525,8 @@
 
             detailsElement.style.display =
                 "none";
+
+            chatButton.disabled = true;
 
         }
 
@@ -500,9 +541,7 @@
 
         try {
 
-            chatButton.disabled =
-                true;
-
+            chatButton.disabled = true;
 
             chatButton.textContent =
                 "Creating private chat...";
@@ -514,13 +553,9 @@
             );
 
 
-            // =================================================
-            // CREATE PRIVATE CHAT
-            // =================================================
-            //
-            // POST /api/chat/start
-            //
-            // =================================================
+            // ---------------------------------------------
+            // CHAT API
+            // ---------------------------------------------
 
             const chatUrl =
                 `${API_URL}/api/chat/start`;
@@ -532,6 +567,10 @@
             );
 
 
+            // ---------------------------------------------
+            // CREATE CHAT
+            // ---------------------------------------------
+
             const chatResponse =
                 await fetch(
                     chatUrl,
@@ -540,6 +579,9 @@
 
                         headers: {
                             "Content-Type":
+                                "application/json",
+
+                            "Accept":
                                 "application/json"
                         },
 
@@ -554,8 +596,24 @@
                 );
 
 
-            const chatData =
-                await chatResponse.json();
+            // ---------------------------------------------
+            // READ CHAT RESPONSE
+            // ---------------------------------------------
+
+            let chatData;
+
+            try {
+
+                chatData =
+                    await chatResponse.json();
+
+            } catch (jsonError) {
+
+                throw new Error(
+                    `Chat server returned an invalid response. HTTP ${chatResponse.status}`
+                );
+
+            }
 
 
             console.log(
@@ -564,20 +622,24 @@
             );
 
 
+            // ---------------------------------------------
+            // CHECK RESPONSE
+            // ---------------------------------------------
+
             if (!chatResponse.ok) {
 
                 throw new Error(
                     chatData.message ||
                     chatData.error ||
-                    "Unable to create private chat."
+                    `Unable to create private chat. HTTP ${chatResponse.status}`
                 );
 
             }
 
 
-            // =================================================
-            // MAKE SURE CHAT DATA EXISTS
-            // =================================================
+            // ---------------------------------------------
+            // CHECK CHAT DATA
+            // ---------------------------------------------
 
             if (
                 !chatData.chatId ||
@@ -591,16 +653,26 @@
             }
 
 
-            // =================================================
+            // ---------------------------------------------
             // OPEN CHAT
-            // =================================================
+            // ---------------------------------------------
 
-            window.location.href =
+            const chatPage =
                 `/chat.html` +
                 `?nfcId=${encodeURIComponent(nfcId)}` +
                 `&chatId=${encodeURIComponent(chatData.chatId)}` +
                 `&role=finder` +
                 `&token=${encodeURIComponent(chatData.finderToken)}`;
+
+
+            console.log(
+                "Opening chat:",
+                chatPage
+            );
+
+
+            window.location.href =
+                chatPage;
 
 
         } catch (error) {
@@ -619,7 +691,6 @@
 
             chatButton.disabled =
                 false;
-
 
             chatButton.textContent =
                 "Start Private Chat";
